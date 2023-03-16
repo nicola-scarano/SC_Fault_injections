@@ -267,7 +267,7 @@ def main(args):
 
 
     cwd=os.getcwd() 
-    student_model.eval() 
+    teacher_model.eval() 
     # student_model.deactivate_analysis()
     full_log_path=os.path.join(cwd,name_config)
     # 1. create the fault injection setup
@@ -275,12 +275,12 @@ def main(args):
 
     # 2. Run a fault free scenario to generate the golden model
     FI_setup.open_golden_results("Golden_results")
-    evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-            log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+    evaluate(teacher_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+            log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
     FI_setup.close_golden_results()
 
     # 3. Prepare the Model for fault injections
-    FI_setup.FI_framework.create_fault_injection_model(device,student_model,
+    FI_setup.FI_framework.create_fault_injection_model(device,teacher_model,
                                         batch_size=test_batch_size,
                                         input_shape=[3,224,224],
                                         layer_types=[torch.nn.Conv2d],Neurons=True)
@@ -311,7 +311,7 @@ def main(args):
         try:   
             # 5.2 run the inference with the faulty model 
             evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+                log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
         
         except OSError as Oserr:
             msg=f"Oserror: {Oserr}"

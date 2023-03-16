@@ -1,0 +1,30 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+url = "https://download.pytorch.org/whl/cu116/"
+verify_ssl = false
+name = "pytorch"
+
+[dev-packages]
+
+[packages]
+torch = {version="==1.12.0+cu116", index="pytorch"}
+torchvision = {version="*", index="pytorch"}
+numpy = "*"
+scipy = "*"
+cython = "*"
+pycocotools = ">=2.0.2"
+matplotlib = "*"
+seaborn = "*"
+compressai = ">=1.1.9"
+sc2bench = {editable = true, path = "."}
+timm = "*"
+pandas = "*"
+pytorchfi = {editable = true, path = "./SC_Fault_injections/pytorchfi_SC/"}
+torchdistill = {editable = true, path = "./torchdistill-0.3.3/"}
+
+[requires]
+python_version = "3.8"

@@ -2,7 +2,7 @@
 
 git pull --recurse-submodules 
 
-mv Pipfile ../Pipfile
+cp Pipfile ../Pipfile
 
 cd ..
 

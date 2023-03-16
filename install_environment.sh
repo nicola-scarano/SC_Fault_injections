@@ -1,6 +1,6 @@
 
 
-git pull --recurse-submodules 
+# git pull --recurse-submodules 
 
 cp Pipfile ../Pipfile
 

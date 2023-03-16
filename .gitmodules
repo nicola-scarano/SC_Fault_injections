@@ -1,0 +1,3 @@
+[submodule "pytorchfi_SC"]
+	path = pytorchfi_SC
+	url = https://github.com/divadnauj-GB/pytorchfi_SC

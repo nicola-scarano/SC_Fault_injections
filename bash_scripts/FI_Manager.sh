@@ -1,3 +1,5 @@
+
+
 pipenv run python SC_Fault_injections/script/image_classification_FI_master_sbfm.py --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50_faulty.yaml --device cuda --log FI_logging_neuron_original.log -test_only -student_only 
 pipenv run python SC_Fault_injections/script/image_classification_FI_sbfm.py --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq1ch_from_resnet50_faulty.yaml --device cuda --log FI_logging_ch1.log -test_only -student_only 
 pipenv run python SC_Fault_injections/script/image_classification_FI_sbfm.py --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq2ch_from_resnet50_faulty.yaml --device cuda --log FI_logging_ch2.log -test_only -student_only 

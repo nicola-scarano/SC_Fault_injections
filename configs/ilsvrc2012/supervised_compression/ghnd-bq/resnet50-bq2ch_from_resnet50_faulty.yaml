@@ -191,6 +191,6 @@ test:
 
 
 fault_info:
-  layer: 4
+  layer: 5
   mode_inj: 'weight'
   num_threads: 32

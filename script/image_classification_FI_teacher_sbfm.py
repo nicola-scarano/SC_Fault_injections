@@ -299,7 +299,7 @@ def main(args):
     # 5. Execute the fault injection campaign
     for fault,k in FI_setup.iter_fault_list():
         # 5.1 inject the fault in the model
-        FI_setup.FI_framework.bit_flip_weight_inj([fault[0]],[fault[1]],[fault[2]],[fault[3]],[fault[4]],[fault[5]])
+        FI_setup.FI_framework.bit_flip_weight_inj(fault)
         FI_setup.open_faulty_results(f"F_{k}_results")
         try:   
             # 5.2 run the inference with the faulty model 

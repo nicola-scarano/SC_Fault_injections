@@ -295,7 +295,9 @@ def main(args):
                                  size_tail_y=32, 
                                  size_tail_x=32,
                                  block_fault_rate=0.01,
-                                 neuron_fault_rate=0.001)  
+                                 neuron_fault_rate_start=0.005,
+                                 neuron_fault_rate_delta=0.01,
+                                 neuron_fault_rate_steps=10)     
       
     FI_setup.load_check_point()
 

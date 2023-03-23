@@ -190,6 +190,6 @@ test:
     num_workers: 8
 
 fault_info:
-  layer: 5
+  layer: 4
   mode_inj: 'weight'
   num_threads: 32

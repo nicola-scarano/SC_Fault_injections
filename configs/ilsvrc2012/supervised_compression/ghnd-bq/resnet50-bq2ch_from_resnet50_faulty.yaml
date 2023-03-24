@@ -191,6 +191,17 @@ test:
 
 
 fault_info:
-  layer: 4
-  mode_inj: 'weight'
-  num_threads: 32
+  weights: 
+    mode_inj: 'weight'
+    layer: [4]    
+  neurons:
+    mode_inj: 'neurons'
+    layers: [4]
+    trials: 5
+    size_tail_y: 32 
+    size_tail_x: 32
+    block_fault_rate_delta: 0.1
+    block_fault_rate_steps: 5
+    neuron_fault_rate_delta: 0.1
+    neuron_fault_rate_steps: 5
+    num_threads: 32

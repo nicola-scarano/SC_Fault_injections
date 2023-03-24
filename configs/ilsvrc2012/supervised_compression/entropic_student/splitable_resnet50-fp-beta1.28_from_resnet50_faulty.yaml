@@ -65,7 +65,7 @@ models:
           - type: 'FileSizeAnalyzer'
             params:
               unit: 'KB'
-    experiment: &student_experiment !join [*dataset_name, '-', *student_model_name, '50-fp-beta5.12_from_', *teacher_model_name]
+    experiment: &student_experiment !join [*dataset_name, '-', *student_model_name, '50-fp-beta1.28_from_', *teacher_model_name]
     ckpt: !join ['./resource/ckpt/ilsvrc2012/supervised_compression/entropic_student/', *student_experiment, '.pt']
 
 train:
@@ -181,7 +181,7 @@ train:
             params:
               entropy_module_path: 'bottleneck_layer.entropy_bottleneck'
               reduction: 'sum'
-          factor: 5.12
+          factor: 1.28
   stage2:
     num_epochs: 10
     train_data_loader:
@@ -239,5 +239,21 @@ test:
   test_data_loader:
     dataset_id: *imagenet_val
     random_sample: False
-    batch_size: 1
-    num_workers: 16
+    batch_size: 64
+    num_workers: 8
+
+fault_info:
+  weights: 
+    mode_inj: 'weight'
+    layer: [2]    
+  neurons:
+    mode_inj: 'neurons'
+    layers: [2]
+    trials: 5
+    size_tail_y: 32 
+    size_tail_x: 32
+    block_fault_rate_delta: 0.1
+    block_fault_rate_steps: 5
+    neuron_fault_rate_delta: 0.1
+    neuron_fault_rate_steps: 5
+    num_threads: 32

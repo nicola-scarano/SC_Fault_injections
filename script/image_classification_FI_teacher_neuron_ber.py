@@ -262,8 +262,8 @@ def main(args):
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
 
     name_config=((args.config.split('/'))[-1]).replace(".yaml","")
-    conf_fault_dict=config['fault_info']
-    name_config=f"FSIM_logs/{name_config}_neurons_{conf_fault_dict['layer']}"
+    conf_fault_dict=config['fault_info']['neurons']
+    name_config=f"FSIM_logs/{name_config}_neurons_{conf_fault_dict['layer'][0]}"
 
 
     cwd=os.getcwd() 
@@ -290,14 +290,14 @@ def main(args):
     #logging.getLogger('pytorchfi.neuron_error_models').disabled = True
     FI_setup.generate_fault_list(flist_mode='neurons',
                                  f_list_file='fault_list.csv',
-                                 layers=[4],
-                                 trials=10, 
-                                 size_tail_y=32, 
-                                 size_tail_x=32,
-                                 block_fault_rate=0.01,
-                                 neuron_fault_rate_start=0.005,
-                                 neuron_fault_rate_delta=0.01,
-                                 neuron_fault_rate_steps=10)   
+                                 layers=conf_fault_dict['layers'],
+                                 trials=conf_fault_dict['trials'], 
+                                 size_tail_y=conf_fault_dict['size_tail_y'], 
+                                 size_tail_x=conf_fault_dict['size_tail_x'],
+                                 block_fault_rate_delta=conf_fault_dict['block_fault_rate_delta'],
+                                 block_fault_rate_steps=conf_fault_dict['block_fault_rate_steps'],
+                                 neuron_fault_rate_delta=conf_fault_dict['neuron_fault_rate_delta'],
+                                 neuron_fault_rate_steps=conf_fault_dict['neuron_fault_rate_steps'])     
       
     FI_setup.load_check_point()
 

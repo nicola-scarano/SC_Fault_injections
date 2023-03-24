@@ -263,7 +263,7 @@ def main(args):
 
     name_config=((args.config.split('/'))[-1]).replace(".yaml","")
     conf_fault_dict=config['fault_info']['neurons']
-    name_config=f"FSIM_logs/{name_config}_neurons_{conf_fault_dict['layer'][0]}"
+    name_config=f"FSIM_logs/{name_config}_neurons_{conf_fault_dict['layers'][0]}"
 
 
     cwd=os.getcwd() 

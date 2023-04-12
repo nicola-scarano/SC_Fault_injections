@@ -8,7 +8,7 @@ cd ..
 
 conda env create -f environment.yaml
 source ~/miniconda3/bin/activate
-conda init bash
+conda deactivate
 conda activate sc2-benchmark
 
 python -m pip install -e .

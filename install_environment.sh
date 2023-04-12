@@ -5,10 +5,10 @@
 cp environment.yaml ../environment.yaml
 
 cd ..
-
-conda env create -f environment.yaml
 source ~/miniconda3/bin/activate
 conda deactivate
+
+conda env create -f environment.yaml
 conda activate sc2-benchmark
 
 python -m pip install -e .

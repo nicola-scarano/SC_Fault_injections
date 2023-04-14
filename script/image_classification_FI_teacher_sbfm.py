@@ -269,8 +269,9 @@ def main(args):
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
 
     name_config=((args.config.split('/'))[-1]).replace(".yaml","")
-    conf_fault_dict=config['fault_info']
-    name_config=f"FSIM_logs/{name_config}_{conf_fault_dict['mode_inj']}_{conf_fault_dict['layer']}"
+    conf_fault_dict=config['fault_info']['weights']
+    name_config=f"FSIM_logs/{name_config}_weights_{conf_fault_dict['layers'][0]}"
+
 
     cwd=os.getcwd() 
     teacher_model.eval() 
@@ -293,7 +294,7 @@ def main(args):
     # input("wait for a second...")
     # 4. generate the fault list
     logging.getLogger('pytorchfi').disabled = True
-    FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'])    
+    FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layers'][0])    
     FI_setup.load_check_point()
 
     # 5. Execute the fault injection campaign

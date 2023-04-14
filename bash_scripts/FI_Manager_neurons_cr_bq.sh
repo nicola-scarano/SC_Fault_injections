@@ -15,15 +15,19 @@
 
 # #pipenv run python SC_Fault_injections/script/image_classification_FI_neuron_ber.py --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq3ch_from_resnet50.yaml --device cuda --log FI_logging.log -test_only -student_only  
 
+source ~/miniconda3/bin/activate 
+conda deactivate
+conda activate sc2-benchmark
+
 for bch in 1 2 3 6 9 12; do
-  pipenv run python SC_Fault_injections/script/image_classification_FI_neuron_ber.py -student_only \
+  python SC_Fault_injections/script/image_classification_FI_neuron_ber.py -student_only \
     --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq${bch}ch_from_resnet50_faulty.yaml\
     --device cuda\
     --log log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq${bch}ch_from_resnet50.log\
     -test_only -student_only 
 done
 
-pipenv run python SC_Fault_injections/script/image_classification_FI_teacher_neuron_ber.py \
+python SC_Fault_injections/script/image_classification_FI_teacher_neuron_ber.py \
     --config SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50_faulty.yaml\
     --device cuda\
     --log log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50_faulty.log\

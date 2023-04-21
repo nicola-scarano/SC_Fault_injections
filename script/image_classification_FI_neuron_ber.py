@@ -283,7 +283,7 @@ def main(args):
     FI_setup.FI_framework.create_fault_injection_model(device,student_model,
                                         batch_size=test_batch_size,
                                         input_shape=[3,224,224],
-                                        layer_types=[torch.nn.Conv2d],Neurons=True)
+                                        layer_types=[torch.nn.Conv2d,torch.nn.Linear],Neurons=True)
     
     # 4. generate the fault list
     logging.getLogger('pytorchfi').disabled = True

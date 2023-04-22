@@ -204,7 +204,8 @@ def main(args):
     if is_main_process() and log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
 
-    distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    distributed, device_ids = False, None
     logger.info(args)
     cudnn.enabled=True
     # cudnn.benchmark = True

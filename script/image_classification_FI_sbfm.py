@@ -309,9 +309,8 @@ def main(args):
             msg=f"Exception error: {Error}"
             logger.info(msg)
         # 5.3 Report the results of the fault injection campaign
-        FI_setup.close_faulty_results()
         FI_setup.parse_results()
-        FI_setup.write_reports()
+    FI_setup.terminate_fsim()
 
 
 if __name__ == '__main__':

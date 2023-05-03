@@ -53,7 +53,7 @@ models:
       bottleneck_config:
         name: 'larger_resnet_bottleneck'
         params:
-          bottleneck_channel: &bch 1
+          bottleneck_channel: &bch 12
           bottleneck_idx: 12
           output_channel: 256
           compressor_transform_params:
@@ -188,8 +188,3 @@ test:
     random_sample: False
     batch_size: 64
     num_workers: 8
-
-fault_info:
-  layer: 4
-  mode_inj: 'neuron'
-  num_threads: 32

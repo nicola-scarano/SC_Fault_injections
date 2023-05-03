@@ -61,6 +61,7 @@ def get_argparser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
+    parser.add_argument('--fsim_config', help='Yaml file path fsim config')
     return parser
 
 
@@ -269,50 +270,54 @@ def main(args):
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
 
-    name_config=((args.config.split('/'))[-1]).replace(".yaml","")
-    conf_fault_dict=config['fault_info']['weights']
-    name_config=f"FSIM_logs/{name_config}_weights_{conf_fault_dict['layer'][0]}"
+    # name_config=((args.config.split('/'))[-1]).replace(".yaml","")
+    # conf_fault_dict=config['fault_info']['weights']
+    # name_config=f"FSIM_logs/{name_config}_weights_{conf_fault_dict['layer'][0]}"
 
+    if args.fsim_config:
+        fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
+        conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
+        cwd=os.getcwd() 
+        teacher_model.eval() 
+        # student_model.deactivate_analysis()
+        # full_log_path=os.path.join(cwd,name_config)
+        full_log_path=cwd
+        # 1. create the fault injection setup
+        FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
 
-    cwd=os.getcwd() 
-    teacher_model.eval() 
-    # student_model.deactivate_analysis()
-    full_log_path=os.path.join(cwd,name_config)
-    # 1. create the fault injection setup
-    FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
+        # 2. Run a fault free scenario to generate the golden model
+        FI_setup.open_golden_results("Golden_results")
+        evaluate(teacher_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        FI_setup.close_golden_results()
 
-    # 2. Run a fault free scenario to generate the golden model
-    FI_setup.open_golden_results("Golden_results")
-    evaluate(teacher_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-            log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
-    FI_setup.close_golden_results()
+        # 3. Prepare the Model for fault injections
+        FI_setup.FI_framework.create_fault_injection_model(device,teacher_model,
+                                            batch_size=1,
+                                            input_shape=[3,224,224],
+                                            layer_types=[torch.nn.Conv2d,torch.nn.Linear])
+        # input("wait for a second...")
+        # 4. generate the fault list
+        logging.getLogger('pytorchfi').disabled = True
+        FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
+        FI_setup.load_check_point()
 
-    # 3. Prepare the Model for fault injections
-    FI_setup.FI_framework.create_fault_injection_model(device,teacher_model,
-                                        batch_size=1,
-                                        input_shape=[3,224,224],
-                                        layer_types=[torch.nn.Conv2d,torch.nn.Linear])
-    # input("wait for a second...")
-    # 4. generate the fault list
-    logging.getLogger('pytorchfi').disabled = True
-    FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
-    FI_setup.load_check_point()
-
-    # 5. Execute the fault injection campaign
-    for fault,k in FI_setup.iter_fault_list():
-        # 5.1 inject the fault in the model
-        FI_setup.FI_framework.bit_flip_weight_inj(fault)
-        FI_setup.open_faulty_results(f"F_{k}_results")
-        try:   
-            # 5.2 run the inference with the faulty model 
-            evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
-        except Exception as Error:
-            msg=f"Exception error: {Error}"
-            logger.info(msg)
-        # 5.3 Report the results of the fault injection campaign
-        FI_setup.parse_results()
-    FI_setup.terminate_fsim()
+        # 5. Execute the fault injection campaign
+        for fault,k in FI_setup.iter_fault_list():
+            # 5.1 inject the fault in the model
+            FI_setup.FI_framework.bit_flip_weight_inj(fault)
+            FI_setup.open_faulty_results(f"F_{k}_results")
+            try:   
+                # 5.2 run the inference with the faulty model 
+                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                    log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+            except Exception as Error:
+                msg=f"Exception error: {Error}"
+                logger.info(msg)
+            # 5.3 Report the results of the fault injection campaign            
+            FI_setup.parse_results()
+            # break
+        FI_setup.terminate_fsim()
 
 
 if __name__ == '__main__':

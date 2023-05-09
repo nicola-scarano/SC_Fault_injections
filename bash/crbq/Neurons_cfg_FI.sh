@@ -7,7 +7,6 @@ conda deactivate
 cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
 
 conda activate sc2-benchmark
-module load nvidia/cudasdk/11.6
 
 which python
 which pip

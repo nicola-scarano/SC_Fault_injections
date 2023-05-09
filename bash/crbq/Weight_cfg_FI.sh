@@ -1,13 +1,4 @@
 #!/bin/bash
-#SBATCH --time=48:00:00
-#SBATCH --nodes=1
-#SBATCH --partition=cuda
-#SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=8
-#SBATCH --job-name=WeightsSplit
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=juan.guerrero@polito.it
-
 
 # 1 Activate the virtual environment
 source ~/miniconda3/bin/activate
@@ -16,7 +7,6 @@ conda deactivate
 cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
 
 conda activate sc2-benchmark
-module load nvidia/cudasdk/11.6
 
 which python
 which pip

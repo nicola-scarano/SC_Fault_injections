@@ -1,4 +1,5 @@
 #!/bin/bash
+<<<<<<< HEAD
 #SBATCH --time=48:00:00
 #SBATCH --nodes=1
 #SBATCH --partition=cuda
@@ -8,6 +9,8 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=s302179@studenti.polito.it
 
+=======
+>>>>>>> 2acfb732e673744a5fe03e487e79507e1718af96
 
 # 1 Activate the virtual environment
 source ~/miniconda3/bin/activate sc2-benchmark
@@ -15,8 +18,12 @@ source ~/miniconda3/bin/activate sc2-benchmark
 
 cd  /home/gesposito/sc2-benchmark
 
+<<<<<<< HEAD
 # conda activate sc2benchmark
 module load nvidia/cudasdk/11.6
+=======
+conda activate sc2-benchmark
+>>>>>>> 2acfb732e673744a5fe03e487e79507e1718af96
 
 which python
 which pip

@@ -3,6 +3,7 @@ import datetime
 import json
 import os
 import time
+import sys
 
 import torch
 from torch import distributed as dist
@@ -24,10 +25,7 @@ from sc2bench.models.backbone import check_if_updatable
 from sc2bench.models.registry import load_classification_model
 from sc2bench.models.wrapper import get_wrapped_classification_model
 
-import pytorchfi
-from pytorchfi import core
-from pytorchfi import neuron_error_models
-from pytorchfi import weight_error_models
+
 
 from pytorchfi.core import FaultInjection
 
@@ -40,7 +38,7 @@ from torch.utils.data import DataLoader, Subset
 
 logger = def_logger.getChild(__name__)
 # comment this line, otherwise the fault injections will collapse due to leaking memory produced by 'file_system
-#torch.multiprocessing.set_sharing_strategy('file_system')
+# torch.multiprocessing.set_sharing_strategy('file_system')
 import logging
 
 def get_argparser():
@@ -61,7 +59,7 @@ def get_argparser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
-    parser.add_argument('--fsim_config', help='Yaml file path fsim config')
+    parser.add_argument('--fsim_config', required=True, help='Yaml file path fsim config')
     return parser
 
 
@@ -135,7 +133,6 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
             Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
         else:
             output = model(image)
-
         acc1, acc5 = compute_accuracy(output, target, topk=(1, 5))
         # FIXME need to take into account that the datasets
         # could have been padded in distributed setup
@@ -202,12 +199,12 @@ def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, de
 
 def main(args):
     log_file_path = args.log
-    if is_main_process() and log_file_path is not None:
+    if log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
-
     # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
     distributed, device_ids = False, None
     logger.info(args)
+    
     cudnn.enabled=True
     # cudnn.benchmark = True
     cudnn.deterministic = True
@@ -222,7 +219,6 @@ def main(args):
     if args.json is not None:
         logger.info('Overwriting config')
         overwrite_config(config, json.loads(args.json))
-
     device = torch.device(args.device)
     dataset_dict = util.get_all_datasets(config['datasets'])
     models_config = config['models']
@@ -261,7 +257,6 @@ def main(args):
     if check_if_analyzable(student_model):
         student_model.activate_analysis()
         
-
     test_batch_size=config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
@@ -277,7 +272,6 @@ def main(args):
         fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
         conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
         cwd=os.getcwd() 
-        student_model.eval() 
         # student_model.deactivate_analysis()
         #full_log_path=os.path.join(cwd,name_config)
         full_log_path=cwd
@@ -305,17 +299,20 @@ def main(args):
         for fault,k in FI_setup.iter_fault_list():
             # 5.1 inject the fault in the model
             FI_setup.FI_framework.bit_flip_weight_inj(fault)
-            FI_setup.open_faulty_results(f"F_{k}_results")
+            FI_setup.open_faulty_results(f"F_{k}_results")  
             try:   
                 # 5.2 run the inference with the faulty model 
                 evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                    log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+                    log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup) 
             except Exception as Error:
                 msg=f"Exception error: {Error}"
                 logger.info(msg)
             # 5.3 Report the results of the fault injection campaign            
             FI_setup.parse_results()
-            # break
+
+            # print(FI_setup.FI_report.current_matrix)
+            # print(FI_setup.FI_report.G_pred_current)
+            # print(FI_setup.FI_report.G_clas_current)
         FI_setup.terminate_fsim()
 
 

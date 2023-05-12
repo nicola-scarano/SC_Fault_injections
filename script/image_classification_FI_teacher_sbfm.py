@@ -278,6 +278,7 @@ def main(args):
         fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
         conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
         cwd=os.getcwd() 
+        # it already does this
         teacher_model.eval() 
         # student_model.deactivate_analysis()
         # full_log_path=os.path.join(cwd,name_config)

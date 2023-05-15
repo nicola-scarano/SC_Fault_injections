@@ -25,7 +25,10 @@ from sc2bench.models.backbone import check_if_updatable
 from sc2bench.models.registry import load_classification_model
 from sc2bench.models.wrapper import get_wrapped_classification_model
 
-
+import pytorchfi
+from pytorchfi import core
+from pytorchfi import neuron_error_models
+from pytorchfi import weight_error_models
 
 from pytorchfi.core import FaultInjection
 
@@ -59,7 +62,7 @@ def get_argparser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
-    parser.add_argument('--fsim_config', required=True, help='Yaml file path fsim config')
+    parser.add_argument('--fsim_config', help='Yaml file path fsim config')
     return parser
 
 
@@ -199,7 +202,7 @@ def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, de
 
 def main(args):
     log_file_path = args.log
-    if log_file_path is not None:
+    if is_main_process() and log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
     # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
     distributed, device_ids = False, None
@@ -309,10 +312,6 @@ def main(args):
                 logger.info(msg)
             # 5.3 Report the results of the fault injection campaign            
             FI_setup.parse_results()
-
-            # print(FI_setup.FI_report.current_matrix)
-            # print(FI_setup.FI_report.G_pred_current)
-            # print(FI_setup.FI_report.G_clas_current)
         FI_setup.terminate_fsim()
 
 

@@ -32,6 +32,9 @@ from sc2bench.models.detection.wrapper import get_wrapped_detection_model
 logger = def_logger.getChild(__name__)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+from pytorchfi.FI_Weights import FI_manager 
+from Fsim_utils import setup_test_dataloader
+
 
 def get_argparser():
     parser = argparse.ArgumentParser(description='Supervised compression for object detection tasks')
@@ -53,6 +56,7 @@ def get_argparser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
+    parser.add_argument('--fsim_config', help='Yaml file path fsim config')
     return parser
 
 
@@ -114,7 +118,7 @@ def log_info(*args, **kwargs):
 
 @torch.inference_mode()
 def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distributed, no_dp_eval=False,
-             log_freq=1000, title=None, header='Test:'):
+             log_freq=1000, title=None, header='Test:', fsim_enabled:bool=False, Fsim_setup:FI_manager=None):
     model = model_wo_ddp.to(device)
     if distributed and not no_dp_eval:
         model = DistributedDataParallel(model, device_ids=device_ids)
@@ -236,10 +240,20 @@ def main(args):
     if is_main_process() and log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
 
-    distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    #distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    distributed, device_ids = False, None
     logger.info(args)
+
+    # cuda settings
+    cudnn.enabled=True
     cudnn.benchmark = True
     cudnn.deterministic = True
+    # The flag below controls whether to allow TF32 on matmul. This flag defaults to False
+    # in PyTorch 1.12 and later.
+    torch.backends.cuda.matmul.allow_tf32 = True
+    # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
+    cudnn.allow_tf32 = True
+
     set_seed(args.seed)
     config = yaml_util.load_yaml_file(os.path.expanduser(args.config))
     if args.json is not None:
@@ -282,6 +296,27 @@ def main(args):
         student_model.activate_analysis()
     evaluate(student_model, test_data_loader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
              log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']))
+    
+    # test_batch_size=config['test']['test_data_loader']['batch_size']
+    # test_shuffle=config['test']['test_data_loader']['random_sample']
+    # test_num_workers=config['test']['test_data_loader']['num_workers']
+    # subsampler = DatasetSampling(test_data_loader.dataset,5)
+    # index_dataset=subsampler.listindex()
+    # data_subset=Subset(test_data_loader.dataset, index_dataset)
+    # dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
+
+    if args.fsim_config:
+
+        sim_test_dataloader = setup_test_dataloader(config, test_data_loader)
+        fsim_config_descriptor=yaml_util.load_yaml_file(args.fsim_config)
+        conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
+        cwd=os.getcwd() 
+        full_log_path=cwd
+        # 1. create the fault injection setup
+        FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
+        evaluate(student_model, sim_test_dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        FI_setup.close_golden_results()
 
 
 if __name__ == '__main__':

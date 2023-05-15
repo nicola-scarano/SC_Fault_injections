@@ -6,6 +6,12 @@ It seems it is working, I have launched the jobs on the hpc and in few days we s
 
 Also the golden_f1_1 seems very low and i think that is due to the fact that the number of classes that are in G_clas is larger than the number of classes that are in the ground truth. (I think) This is, in turn, due to the fact that the model is trained to predict 1000 classes and at inference time it potentially can predict 1000 classes and the f1 score also detects this gap since it takes into account also the False Positive and the False negatives.
 
+As total number of classes for the F1Score i take the sum of the predicted and ground truth sets. This is again because it is not necessarily the case that the number of classes in one set is the same as in the other set. 
+
+When you build the test dataloader for the simulation, you list the indices of the images from the original dataset and they do not take into account the balance of the classes in the training dataset.
+(Look at Fsim_utils for my idea of implementation)
+
 Note1: the SC_Fault_injections/bash/Weight_cfg_FI.sh is running on the cpu for debugging purposes, you can esaly switch to the cuda module by changing the arguments you pass to the function that runs the script i.e. python...
 
 Note2: I had to change the paths w.r.t. yours because my folder sc2-benchmark was in a different place. So please check the paths in the *.sh files 
+

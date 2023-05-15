@@ -1,12 +1,10 @@
 #!/bin/bash
 
 # 1 Activate the virtual environment
-source ~/miniconda3/bin/activate
-conda deactivate
+source ~/miniconda3/bin/activate sc2-benchmark
 
-cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
+cd  /home/gesposito/sc2-benchmark
 
-conda activate sc2-benchmark
 
 which python
 which pip

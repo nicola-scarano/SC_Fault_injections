@@ -11,7 +11,6 @@ from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 from torchmetrics import F1Score
 from torchmetrics.classification import MulticlassF1Score
-from torcheval.metrics.functional import multiclass_f1_score
 from torchdistill.common import file_util, yaml_util, module_util
 from torchdistill.common.constant import def_logger
 from torchdistill.common.main_util import is_main_process, init_distributed_mode, load_ckpt, save_ckpt, set_seed
@@ -126,26 +125,25 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
     analyzable = check_if_analyzable(model_wo_ddp)
     metric_logger = MetricLogger(delimiter='  ')
     im=0
-
     val_pred_best = torch.tensor([], requires_grad=False)
     val_distr = torch.tensor([], requires_grad=False)
     val_targ = torch.tensor([], requires_grad=False) 
 
     for image, target in metric_logger.log_every(data_loader, log_freq, header):
+        logger.info('evaluation')
+        val_targ = torch.cat((target, val_targ), dim = -1)
         if isinstance(image, torch.Tensor):
             image = image.to(device, non_blocking=True)
 
         if isinstance(target, torch.Tensor):
             target = target.to(device, non_blocking=True)
-        val_targ = torch.cat((target, val_targ), dim = -1)
+
         if fsim_enabled==True:
             output = model(image)
             Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
         else:
             output = model(image)
-
-        logger.info(output)
-
+        
         soft = torch.nn.Softmax(dim=1)
         distr = soft(output)
         val_distr = torch.cat((distr, val_distr))
@@ -156,48 +154,40 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
         val_pred_best = torch.cat((preds_64, val_pred_best), dim = -1)
 
         #logger.info(val_pred)
-        
+        if fsim_enabled:
+            val_targ = val_targ.type(torch.int64)
+            f1_1 = F1Score(task='multiclass', num_classes=1000, average='macro')
+            best_f1 = f1_1(val_pred_best, val_targ)
+
+            f1_k = MulticlassF1Score(num_classes=1000, average='weighted', top_k=5)
+            # logger.info(f'val_distr: {val_distr}')
+            # logger.info(f'val_targ: {val_targ}')
+            # logger.info(f'val_distr.shape: {val_distr.shape}')
+            # logger.info(f'val_targ.shape: {val_targ.shape}')
+            k_f1 = f1_k(val_distr, val_targ)
+            #
+            # logger.info(f'best_f1: {best_f1}')
+            # logger.info(f'k_f1: {k_f1}')
+
+            Fsim_setup.FI_report.set_f1_values(best_f1=best_f1, k_f1=k_f1, header=header)
+
         acc1, acc5 = compute_accuracy(output, target, topk=(1, 5))
         # FIXME need to take into account that the datasets
         # could have been padded in distributed setup
         batch_size = len(image)
         metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
         metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
+        if im > 3:
+            break
         im+=1
-
-    # logger.info(f'val_out.shape: {val_pred_best.shape}')
-    # logger.info(f'val_targ.shape: {val_targ.shape}')        
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     top1_accuracy = metric_logger.acc1.global_avg
     top5_accuracy = metric_logger.acc5.global_avg
-    logger.info(f'header: {header}')
     logger.info(' * Acc@1 {:.4f}\tAcc@5 {:.4f}\n'.format(top1_accuracy, top5_accuracy))
-
-    if fsim_enabled:
-        val_targ = val_targ.type(torch.int64)
-        f1_1 = F1Score(task='multiclass', num_classes=1000, average='macro')
-        best_f1 = f1_1(val_pred_best, val_targ)
-
-        f1_k = MulticlassF1Score(num_classes=1000, average='weighted', top_k=5)
-        # logger.info(f'val_distr: {val_distr}')
-        # logger.info(f'val_targ: {val_targ}')
-        # logger.info(f'val_distr.shape: {val_distr.shape}')
-        # logger.info(f'val_targ.shape: {val_targ.shape}')
-        k_f1 = f1_k(val_distr, val_targ)
-
-        # logger.info(f'best_f1: {best_f1}')
-        # logger.info(f'k_f1: {k_f1}')
-
-        if header == 'Golden':
-            Fsim_setup.FI_report.goldenf1_1=best_f1
-            Fsim_setup.FI_report.goldenf1_k=k_f1
-        else:
-            Fsim_setup.FI_report.fault_f1_1=best_f1
-            Fsim_setup.FI_report.fault_f1_k=k_f1 
-
     if analyzable and model_wo_ddp.activated_analysis:
         model_wo_ddp.summarize()
+    return metric_logger.acc1.global_avg
 
 
 def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, device_ids, distributed, config, args):
@@ -251,6 +241,7 @@ def main(args):
     log_file_path = args.log
     if is_main_process() and log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
+
     # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
     distributed, device_ids = False, None
     logger.info(args)

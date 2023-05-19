@@ -29,6 +29,20 @@ from sc2bench.models.detection.base import check_if_updatable_detection_model
 from sc2bench.models.detection.registry import load_detection_model
 from sc2bench.models.detection.wrapper import get_wrapped_detection_model
 
+import pytorchfi
+from pytorchfi import core
+from pytorchfi import neuron_error_models
+from pytorchfi import weight_error_models
+
+from pytorchfi.core import FaultInjection
+
+from pytorchfi.FI_Weights import FI_report_classifier
+from pytorchfi.FI_Weights import FI_framework
+from pytorchfi.FI_Weights import FI_manager 
+from pytorchfi.FI_Weights import DatasetSampling 
+
+from torch.utils.data import DataLoader, Subset
+
 logger = def_logger.getChild(__name__)
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -53,6 +67,7 @@ def get_argparser():
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
+    parser.add_argument('--fsim_config', help='Yaml file path fsim config')
     return parser
 
 
@@ -114,7 +129,7 @@ def log_info(*args, **kwargs):
 
 @torch.inference_mode()
 def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distributed, no_dp_eval=False,
-             log_freq=1000, title=None, header='Test:'):
+             log_freq=1000, title=None, header='Test:', fsim_enabled=True, Fsim_setup:FI_manager=None):
     model = model_wo_ddp.to(device)
     if distributed and not no_dp_eval:
         model = DistributedDataParallel(model, device_ids=device_ids)
@@ -142,15 +157,22 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
     if iou_types is None or (isinstance(iou_types, (list, tuple)) and len(iou_types) == 0):
         iou_types = get_iou_types(model)
 
+    logger.info(f'coco: {coco}')
     coco_evaluator = CocoEvaluator(coco, iou_types)
+    # im = 0
     for sample_batch, targets in metric_logger.log_every(data_loader, log_freq, header):
         sample_batch = list(image.to(device) for image in sample_batch)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        torch.cuda.synchronize()
+        logger.info(f'sample batch: {sample_batch}')
+        #torch.cuda.synchronize()
         model_time = time.time()
+        logger.info(f'targets: {targets}')
         outputs = model(sample_batch)
-
+        logger.info(f'model: {model}')
+        # why is "outputs" empty?
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+        logger.info(f'outputs: {outputs}')
+        
         model_time = time.time() - model_time
 
         res = {target['image_id'].item(): output for target, output in zip(targets, outputs)}
@@ -158,11 +180,14 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
+        # im += 1
+        # if im == 3:
+        #     break 
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     avg_stats_str = 'Averaged stats: {}'.format(metric_logger)
-    logger.info(avg_stats_str)
+    logger.info(f'avg_stats_str: {avg_stats_str}')
     coco_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
@@ -236,10 +261,19 @@ def main(args):
     if is_main_process() and log_file_path is not None:
         setup_log_file(os.path.expanduser(log_file_path))
 
-    distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
+    distributed, device_ids = False, None
     logger.info(args)
-    cudnn.benchmark = True
+
+    cudnn.enabled=True
+    # cudnn.benchmark = True
     cudnn.deterministic = True
+    # The flag below controls whether to allow TF32 on matmul. This flag defaults to False
+    # in PyTorch 1.12 and later.
+    torch.backends.cuda.matmul.allow_tf32 = True
+    # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
+    cudnn.allow_tf32 = True
+
     set_seed(args.seed)
     config = yaml_util.load_yaml_file(os.path.expanduser(args.config))
     if args.json is not None:
@@ -248,13 +282,17 @@ def main(args):
 
     device = torch.device(args.device)
     dataset_dict = util.get_all_datasets(config['datasets'])
-    models_config = config['models']
+    models_config = config['models'] 
     teacher_model_config = models_config.get('teacher_model', None)
     teacher_model = load_model(teacher_model_config, device) if teacher_model_config is not None else None
     student_model_config =\
         models_config['student_model'] if 'student_model' in models_config else models_config['model']
     ckpt_file_path = student_model_config.get('ckpt', None)
     student_model = load_model(student_model_config, device)
+    logger.info(f'student_model_config: {student_model_config}')
+    logger.info(f'student_model: {student_model}')
+    logger.info(f'ckpt_file_path: {ckpt_file_path}')
+
     if args.log_config:
         logger.info(config)
 
@@ -280,9 +318,32 @@ def main(args):
 
     if check_if_analyzable(student_model):
         student_model.activate_analysis()
-    evaluate(student_model, test_data_loader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+    evaluate(student_model, test_data_loader, iou_types=iou_types, device=device, device_ids = device_ids, distributed=distributed, no_dp_eval=no_dp_eval,
              log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']))
+    
+    test_batch_size=config['test']['test_data_loader']['batch_size']
+    test_shuffle=config['test']['test_data_loader']['random_sample']
+    test_num_workers=config['test']['test_data_loader']['num_workers']
+    subsampler = DatasetSampling(test_data_loader.dataset,1)
+    index_dataset=subsampler.listindex()
+    data_subset=Subset(test_data_loader.dataset, index_dataset)
+    dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
 
+    if args.fsim_config:
+        fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
+        conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
+        cwd=os.getcwd() 
+        student_model.eval() 
+        # student_model.deactivate_analysis()
+        #full_log_path=os.path.join(cwd,name_config)
+        full_log_path=cwd
+        # 1. create the fault injection setup
+        FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
+
+        # 2. Run a fault free scenario to generate the golden model
+        FI_setup.open_golden_results("Golden_results")
+        evaluate(student_model, dataloader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
 
 if __name__ == '__main__':
     argparser = get_argparser()

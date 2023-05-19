@@ -10,22 +10,20 @@
 
 
 # 1 Activate the virtual environment
-source ~/miniconda3/bin/activate
-conda deactivate
+source ~/miniconda3/bin/activate sc2-benchmark
 
-cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
+cd  /home/gesposito/sc2-benchmark
 
-conda activate sc2-benchmark
 module load nvidia/cudasdk/11.6
 
-which python
-which pip
+# which python
+# which pip
 
-pip list
+# pip list
 
-conda list
+# conda list
 
-nvidia-smi
+# nvidia-smi
 
 PWD=`pwd`
 echo ${PWD}

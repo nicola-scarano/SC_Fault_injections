@@ -6,14 +6,14 @@ source ~/miniconda3/bin/activate sc2-benchmark
 cd  /home/gesposito/sc2-benchmark
 
 
-which python
-which pip
+# which python
+# which pip
 
-pip list
+# pip list
 
-conda list
+# conda list
 
-nvidia-smi
+# nvidia-smi
 
 PWD=`pwd`
 echo ${PWD}
@@ -30,7 +30,7 @@ DIR="$3"
 Sim_dir=${global_PWD}/${DIR}/cnf${target_config}_lyr${target_layer}_JOBID${job_id}_W
 mkdir -p ${Sim_dir}
 
-
+echo ${Sim_dir}
 if [ $target_config -eq 77 ]; then 
         cp ${global_PWD}/SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq1ch_from_resnet50.yaml ${Sim_dir}
         cp ${global_PWD}/SC_Fault_injections/configs/ilsvrc2012/supervised_compression/ghnd-bq/Fault_descriptor.yaml ${Sim_dir}
@@ -41,7 +41,7 @@ if [ $target_config -eq 77 ]; then
 
         python ${global_PWD}/SC_Fault_injections/script/image_classification_FI_teacher_sbfm.py -student_only \
                 --config ${Sim_dir}/resnet50-bq1ch_from_resnet50.yaml\
-                --device cuda\
+                --device cpu\
                 --log ${Sim_dir}/log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq1ch_from_resnet50.log\
                 -test_only\
                 --fsim_config ${Sim_dir}/Fault_descriptor.yaml > ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stdo.log 2> ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stde.log
@@ -55,7 +55,7 @@ else
 
         python ${global_PWD}/SC_Fault_injections/script/image_classification_FI_sbfm.py -student_only \
                 --config ${Sim_dir}/resnet50-bq${target_config}ch_from_resnet50.yaml\
-                --device cuda\
+                --device cpu\
                 --log ${Sim_dir}/log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq${target_config}ch_from_resnet50.log\
                 -test_only\
                 --fsim_config ${Sim_dir}/Fault_descriptor.yaml > ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stdo.log 2> ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stde.log

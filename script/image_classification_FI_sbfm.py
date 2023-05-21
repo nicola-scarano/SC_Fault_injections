@@ -145,6 +145,7 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
             output = model(image)
         
         soft = torch.nn.Softmax(dim=1)
+        output = output.to(device='cpu')
         distr = soft(output)
         val_distr = torch.cat((distr, val_distr))
 
@@ -177,9 +178,9 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
         batch_size = len(image)
         metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
         metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
-        if im > 3:
-            break
-        im+=1
+        # if im > 3:
+        #     break
+        # im+=1
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     top1_accuracy = metric_logger.acc1.global_avg

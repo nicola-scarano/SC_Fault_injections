@@ -13,7 +13,7 @@ mkdir -p ${global_PWD}/${DIR}
 input_args=(1 2 3 6 9 12 77)
 
 array_size=${#input_args[@]}
-echo ${global_PWD}/SC_Fault_injections/bash/crbq/Weight_cfg_FI_object_detection.sh
+
 for ((i=0; i<$array_size; i++)); do
     bash ${global_PWD}/SC_Fault_injections/bash/crbq/Weight_cfg_FI_object_detection.sh ${input_args[$((i))]} $target_layer ${DIR}
 done

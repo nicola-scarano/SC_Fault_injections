@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 import time
+import logging
 
 import torch
 from torch import distributed as dist
@@ -173,6 +174,8 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         # print(f'*******3: {outputs}')
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+        print(f'outputs: {outputs}')
+        print(f'targets: {targets}')
         # type(outputs) = list of dictionary of tensors
         # len = 1
         # print(f'*********4: {type(outputs)}')
@@ -294,6 +297,7 @@ def main(args):
     student_model_config =\
         models_config['student_model'] if 'student_model' in models_config else models_config['model']
     ckpt_file_path = student_model_config.get('ckpt', None)
+
     # check the path in the torchdistill package
     # check the dictionary from .pt file
     student_model = load_model(student_model_config, device)
@@ -341,7 +345,6 @@ def main(args):
         student_model.eval() 
 
         full_log_path=cwd
-
         # 1. create the fault injection setup
         FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
 
@@ -352,10 +355,32 @@ def main(args):
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections
-        # FI_setup.FI_framework.create_fault_injection_model(device,student_model,
-        #                                     batch_size=1,
-        #                                     input_shape=[3,224,224],
-        #                                     layer_types=[torch.nn.Conv2d,torch.nn.Linear])
+        FI_setup.FI_framework.create_fault_injection_model(device=device,
+                                            model=student_model,
+                                            batch_size=1,
+                                            input_shape=[3,224,224] , # input images has different sizes
+                                            layer_types=[torch.nn.Conv2d, torch.nn.Linear])
+        logging.getLogger('pytorchfi').disabled = True
+        FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
+        FI_setup.load_check_point()
+
+        # 5. Execute the fault injection campaign
+        for fault,k in FI_setup.iter_fault_list():
+            # 5.1 inject the fault in the model
+            FI_setup.FI_framework.bit_flip_weight_inj(fault)
+            FI_setup.open_faulty_results(f"F_{k}_results")
+            try:   
+                # 5.2 run the inference with the faulty model 
+                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                    log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True, Fsim_setup=FI_setup)        
+            except Exception as Error:
+                msg=f"Exception error: {Error}"
+                logger.info(msg)
+            # 5.3 Report the results of the fault injection campaign            
+            FI_setup.parse_results()
+            # break
+        FI_setup.terminate_fsim()
+        
 
 
 if __name__ == '__main__':

@@ -314,8 +314,8 @@ def main(args):
 
         # 2. Run a fault free scenario to generate the golden model
         FI_setup.open_golden_results("Golden_results")
-        evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        # evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+        #         log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections

@@ -174,8 +174,8 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         # print(f'*******3: {outputs}')
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
-        print(f'outputs: {outputs}')
-        print(f'targets: {targets}')
+        # print(f'outputs: {outputs}')
+        # print(f'targets: {targets}')
         # type(outputs) = list of dictionary of tensors
         # len = 1
         # print(f'*********4: {type(outputs)}')
@@ -371,7 +371,7 @@ def main(args):
             FI_setup.open_faulty_results(f"F_{k}_results")
             try:   
                 # 5.2 run the inference with the faulty model 
-                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                evaluate(FI_setup.FI_framework.faulty_model, dataloader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
                     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True, Fsim_setup=FI_setup)        
             except Exception as Error:
                 msg=f"Exception error: {Error}"

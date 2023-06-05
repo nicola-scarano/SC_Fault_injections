@@ -39,7 +39,7 @@ if [ $target_config -eq 77 ]; then
 
         cd ${Sim_dir}
 
-        python ${global_PWD}/SC_Fault_injections/script/image_classification_FI_teacher_sbfm.py -student_only \
+        python ${global_PWD}/SC_Fault_injections/script/img_classification/image_classification_FI_teacher_sbfm.py -student_only \
                 --config ${Sim_dir}/resnet50-bq1ch_from_resnet50.yaml\
                 --device cpu\
                 --log ${Sim_dir}/log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq1ch_from_resnet50.log\
@@ -53,7 +53,7 @@ else
 
         cd ${Sim_dir}
 
-        python ${global_PWD}/SC_Fault_injections/script/image_classification_FI_sbfm.py -student_only \
+        python ${global_PWD}/SC_Fault_injections/script/img_classification/image_classification_FI_sbfm.py -student_only \
                 --config ${Sim_dir}/resnet50-bq${target_config}ch_from_resnet50.yaml\
                 --device cpu\
                 --log ${Sim_dir}/log/ilsvrc2012/supervised_compression/ghnd-bq/resnet50-bq${target_config}ch_from_resnet50.log\

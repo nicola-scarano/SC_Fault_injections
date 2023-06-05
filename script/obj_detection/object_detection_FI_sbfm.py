@@ -358,7 +358,7 @@ def main(args):
         FI_setup.FI_framework.create_fault_injection_model(device=device,
                                             model=student_model,
                                             batch_size=1,
-                                            input_shape=[3,224,224] , # input images has different sizes
+                                            input_shape=[3,224,224], # input images has different sizes
                                             layer_types=[torch.nn.Conv2d, torch.nn.Linear])
         logging.getLogger('pytorchfi').disabled = True
         FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    

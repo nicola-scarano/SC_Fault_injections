@@ -15,5 +15,5 @@ input_args=(1 2 3 6 9 12 77)
 array_size=${#input_args[@]}
 
 for ((i=0; i<$array_size; i++)); do
-    bash ${global_PWD}/SC_Fault_injections/bash/crbq_img_classification/Weight_cfg_FI.sh ${input_args[$((i))]} $target_layer ${DIR}
+    bash ${global_PWD}/SC_Fault_injections/bash/crbq/img_classification/Weight_cfg_FI.sh ${input_args[$((i))]} $target_layer ${DIR}
 done

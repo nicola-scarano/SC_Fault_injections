@@ -165,7 +165,7 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
 
         # torch.cuda.synchronize()
         model_time = time.time()
-
+        print('ciao6')
         outputs = model(sample_batch)
         # type(outputs) = list of dictionary of tensors
         # len = 1
@@ -333,7 +333,7 @@ def main(args):
     test_batch_size=config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,5)
+    subsampler = DatasetSampling(test_data_loader.dataset,1)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -367,9 +367,12 @@ def main(args):
         # 5. Execute the fault injection campaign
         for fault,k in FI_setup.iter_fault_list():
             # 5.1 inject the fault in the model
+            
             FI_setup.FI_framework.bit_flip_weight_inj(fault)
+            
             FI_setup.open_faulty_results(f"F_{k}_results")
-            try:   
+            
+            try:
                 # 5.2 run the inference with the faulty model 
                 evaluate(FI_setup.FI_framework.faulty_model, dataloader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
                     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True, Fsim_setup=FI_setup)        

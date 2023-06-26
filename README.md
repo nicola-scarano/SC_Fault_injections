@@ -23,7 +23,7 @@ find . -name "*.sh" | xargs chmod +x
 
 # pytorchfi_SC 
 git clone https://github.com/divadnauj-GB/pytorchfi_SC
-
+cd pytorchfi_SC
 # create the sc2-benchmark environmet and install the required dependencies
 # if you already crerated the sc2-benchmark please first remove it and then create it again as follows
 cp environment.yaml ../environment.yaml

@@ -73,9 +73,9 @@ python script/task/object_detection.py -student_only --device cpu -test_only \
 --log log/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.txt
 
 
-python /home/gesposito/sc2-benchmark/SC_Fault_injections/script/obj_detection/object_detection_FI_sbfm.py -student_only \
-        --config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml\
-        --device cpu\
-        --log /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/log/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.log\
-        -test_only\
-        --fsim_config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/Fault_descriptor.yaml
+# python /home/gesposito/sc2-benchmark/SC_Fault_injections/script/obj_detection/object_detection_FI_sbfm.py -student_only \
+#         --config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml\
+#         --device cpu\
+#         --log /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/log/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.log\
+#         -test_only\
+#         --fsim_config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/Fault_descriptor.yaml

@@ -1,4 +1,4 @@
-name: sc2-benchmark-fsims
+name: sc2-benchmark-fsim
 channels:
   - conda-forge
   - defaults

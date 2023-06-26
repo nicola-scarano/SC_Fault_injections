@@ -23,7 +23,7 @@ find . -name "*.sh" | xargs chmod +x
 
 # pytorchfi_SC 
 git clone https://github.com/divadnauj-GB/pytorchfi_SC
-cd pytorchfi_SC
+
 # create the sc2-benchmark environmet and install the required dependencies
 # if you already crerated the sc2-benchmark please first remove it and then create it again as follows
 cp environment.yaml ../environment.yaml
@@ -32,7 +32,7 @@ conda deactivate
 
 conda env create -f environment.yaml
 conda deactivate
-source ~/miniconda3/bin/activate sc2-benchmark
+source ~/miniconda3/bin/activate sc2-benchmark-fsim
 
 python -m pip install -e .
 

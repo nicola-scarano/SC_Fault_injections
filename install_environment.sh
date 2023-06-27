@@ -9,7 +9,7 @@ source ~/miniconda3/bin/activate
 conda deactivate
 
 conda env create -f environment.yaml
-conda activate sc2-benchmark
+conda activate sc2-benchmark-fsim
 
 python -m pip install -e .
 #pip install -e ./torchdistill-0.3.3/

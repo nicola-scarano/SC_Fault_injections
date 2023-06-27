@@ -60,4 +60,5 @@ dependencies:
     - torchvision==0.13.0+cu116
     - torchdistill==0.3.3
     - typing-extensions==4.0.0
+    - torchmetrics==0.11.4
 prefix: /home/gesposito/miniconda3/envs/sc2-benchmark

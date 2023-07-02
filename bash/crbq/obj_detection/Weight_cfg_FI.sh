@@ -68,9 +68,9 @@ echo "All done. Checking results:"
 
 
 
-python script/task/object_detection.py -student_only --device cpu -test_only \
---config configs/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml \
---log log/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.txt
+# python script/task/object_detection.py -student_only --device cpu -test_only \
+# --config configs/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml \
+# --log log/coco2017/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.txt
 
 
 # python /home/gesposito/sc2-benchmark/SC_Fault_injections/script/obj_detection/object_detection_FI_sbfm.py -student_only \

@@ -6,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 from copy import deepcopy
 import math
+import pandas as pd
 
 class BaseMetricResults(dict):
     """Base metric class, that allows fields for pre-defined metrics."""
@@ -89,3 +90,5 @@ class extended_map(MeanAveragePrecision):
         metrics.classes = torch.tensor(classes, dtype=torch.int)
         return metrics
     
+a = pd.DataFrame([1], index=[0])
+print(len(a))

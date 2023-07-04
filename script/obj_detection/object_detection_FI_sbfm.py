@@ -165,7 +165,6 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
 
         # torch.cuda.synchronize()
         model_time = time.time()
-        print('ciao6')
         outputs = model(sample_batch)
         # type(outputs) = list of dictionary of tensors
         # len = 1
@@ -297,7 +296,6 @@ def main(args):
     student_model_config =\
         models_config['student_model'] if 'student_model' in models_config else models_config['model']
     ckpt_file_path = student_model_config.get('ckpt', None)
-
     # check the path in the torchdistill package
     # check the dictionary from .pt file
     student_model = load_model(student_model_config, device)
@@ -333,7 +331,7 @@ def main(args):
     test_batch_size=config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,1)
+    subsampler = DatasetSampling(test_data_loader.dataset,2)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -350,8 +348,8 @@ def main(args):
 
         # 2. Run a fault free scenario to generate the golden model
         FI_setup.open_golden_results("Golden_results")
-        # evaluate(student_model, dataloader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-        #         log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        evaluate(student_model, dataloader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections

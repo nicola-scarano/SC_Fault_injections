@@ -133,7 +133,7 @@ def compute_iou(gt_bb: List[Union[float, float, float, float]],
 def extract_coordinates(bb):
     return math.floor(bb[0]), math.floor(bb[1]), math.ceil(bb[2]), math.ceil(bb[2])
 
-gt_boxes = torch.tensor([[[  3.2700, 266.8500, 404.5000, 475.1000],
+gt_boxes = torch.tensor([[  3.2700, 266.8500, 404.5000, 475.1000],
          [183.3600, 136.5600, 244.1400, 228.9500],
          [455.9800, 192.5000, 464.5500, 228.0900],
          [453.3100, 252.9700, 461.3300, 286.9000],
@@ -149,9 +149,9 @@ gt_boxes = torch.tensor([[[  3.2700, 266.8500, 404.5000, 475.1000],
          [524.3200,  97.3800, 527.1200, 135.1500],
          [493.3600, 155.7200, 525.9500, 162.0800],
          [454.6600, 245.2700, 503.2100, 257.4100],
-         [461.7700, 253.6800, 470.0100, 286.9900]]])
+         [461.7700, 253.6800, 470.0100, 286.9900]])
 
-gt_labels= torch.tensor([[65, 64, 84, 84, 84, 84, 84, 62, 64, 84, 84, 84, 84, 84, 84, 84, 84]])
+gt_labels= torch.tensor([65, 64, 84, 84, 84, 84, 84, 62, 64, 84, 84, 84, 84, 84, 84, 84, 84])
 
 pred_labels = torch.tensor([64, 65, 64, 62, 84, 44, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84,
         84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84, 84,
@@ -274,6 +274,21 @@ pred_scores = torch.tensor([0.9941, 0.9935, 0.9892, 0.9867, 0.9551, 0.9381, 0.92
         0.0522, 0.0504, 0.0501, 0.0499, 0.0498, 0.0497, 0.0496, 0.0495, 0.0494, 0.0493])
 
 
-scores, correspondance_dict = relative_iou(gt_labels=gt_labels, _gt_bbs=gt_boxes, pred_labels=pred_labels, pred_bb=pred_boxes, pred_scores=pred_scores)
-print(scores)
+# scores, correspondance_dict = relative_iou(gt_labels=gt_labels, _gt_bbs=gt_boxes, pred_labels=pred_labels, pred_bb=pred_boxes, pred_scores=pred_scores)
+# print(scores)
 # print(correspondance_dict.keys())
+metric = MeanAveragePrecision()
+preds = [dict(
+    boxes = pred_boxes,
+    labels = pred_labels,
+    scores = pred_scores
+)]
+targets = [dict(
+    boxes = gt_boxes,
+    labels = gt_labels
+)]
+metric.update(preds, targets)
+
+score = metric.compute()
+
+print(score)

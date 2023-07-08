@@ -189,8 +189,8 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        if im > 4:
-            break
+        # if im > 50:
+        #     break
 
         im += 1
 
@@ -331,7 +331,8 @@ def main(args):
     # evaluate(teacher_model, test_data_loader, iou_types, device, device_ids, distributed, no_dp_eval=no_dp_eval,
     #         log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), fsim_enabled=False, Fsim_setup=None)  
     
-    test_batch_size=config['test']['test_data_loader']['batch_size']
+    # test_batch_size=config['test']['test_data_loader']['batch_size']
+    test_batch_size=1
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
     subsampler = DatasetSampling(test_data_loader.dataset,1)
@@ -400,7 +401,6 @@ def main(args):
             end = time.time()
             time4 = end-start 
             print(f'parse_results: {time4}')
-            break
 
         start = time.time()
         FI_setup.terminate_fsim()

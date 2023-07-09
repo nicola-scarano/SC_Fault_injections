@@ -37,7 +37,7 @@ def merge_fsim_reports(path):
         df_pivot = pd.read_csv(os.path.join(path,"Misclassified_images_report.csv"),index_col=[0]) 
         df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID', 'G_Target'], columns='Pred_idx', 
                           values=['G_lab', 'F_lab'])
-        df_pivot.columns = [f'{col}{idx}' for col, idx in df_pivot.columns]
+        df_pivot.columns = [f'{col}{int(idx)}' for col, idx in df_pivot.columns]
         df_pivot = df_pivot.reset_index()
         
         #df_pivot = df_pivot[['FaultID','imID','Pred_idx','G_pred','F_pred','G_clas','F_clas','G_Target']]

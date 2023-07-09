@@ -134,8 +134,8 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         print(f'prev_outputs: {outputs}')
         model_time = time.time() - model_time
         outputs = outputs['out']
-        print(f'outputs: {outputs}')
-        print(f'targets: {targets}')
+        print(f'outputs.argmax(1).flatten(): {outputs.argmax(1).flatten()}')
+        print(f'targets.flatten(): {targets.flatten()}')
         
         if fsim_enabled:
             Fsim_setup.FI_report.update_segmentation_report(im,outputs,targets)
@@ -144,7 +144,7 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        if im > 1:
+        if im > 10:
             break
         im += 1
 

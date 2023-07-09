@@ -10,18 +10,18 @@ def merge_fsim_reports(path):
         items = os.listdir(path)
         csvfiles = [item for item in items if "F_" in item]  
         if len(csvfiles)>0:
-            #if (os.path.exists(os.path.join(path,"Misclassified_images_report.csv"))):
-                # for rep_per_fault in csvfiles:
-                #     os.remove(os.path.join(path,rep_per_fault))
-            if not (os.path.exists(os.path.join(path,"Misclassified_images_report.csv"))):
+            if (os.path.exists(os.path.join(path,"Misclassified_images_report.csv"))):
+                for rep_per_fault in csvfiles:
+                    os.remove(os.path.join(path,rep_per_fault))
+            else:
                 full_report = pd.DataFrame()
                 for rep_per_fault in csvfiles:
                     fault_list= pd.read_csv(os.path.join(path,rep_per_fault),index_col=[0]) 
                     full_report=pd.concat([full_report,fault_list],axis=0, ignore_index=True, sort=False)                
                 full_report.to_csv(os.path.join(path,"Misclassified_images_report.csv"))   
 
-                # for rep_per_fault in csvfiles:
-                #     os.remove(os.path.join(path,rep_per_fault))         
+                for rep_per_fault in csvfiles:
+                    os.remove(os.path.join(path,rep_per_fault))         
         
         fault_list_file=os.path.join(path,"fault_list.csv")
         fsim_report_file=os.path.join(path,"fsim_report.csv")

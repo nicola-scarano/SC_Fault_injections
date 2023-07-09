@@ -28,8 +28,8 @@ def merge_fsim_reports(path):
         fault_list= pd.read_csv(fault_list_file,index_col=[0]) 
         fsim_report= pd.read_csv(fsim_report_file,index_col=[0]) 
 
-        index=((fsim_report['gold_ACC@1'].isna()==False) | (fsim_report['gold_ACC@k'].isna()==False))
-        fsim_report=fsim_report.loc[index]
+        # index=((fsim_report['gold_ACC@1'].isna()==False) | (fsim_report['gold_ACC@k'].isna()==False))
+        # fsim_report=fsim_report.loc[index]
         full_reportfs=pd.concat([fault_list,fsim_report],axis=1)
         full_reportfs.to_csv(os.path.join(path,"fsim_full_report.csv"))
 

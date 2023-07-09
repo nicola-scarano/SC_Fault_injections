@@ -5,14 +5,14 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --job-name=WeightsSplit
 #SBATCH --mail-type=ALL
-#SBATCH --mail-user=juan.guerrero@polito.it
+#SBATCH --mail-user=s302179@studenti.polito.it
 #SBATCH --output=merge_output_%A.log
 #SBATCH --error=merge_error_%A.log
 
 source ~/miniconda3/bin/activate
 conda deactivate
 
-cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
+cd  /home/gesposito/sc2-benchmark
 
 conda activate sc2-benchmark
 

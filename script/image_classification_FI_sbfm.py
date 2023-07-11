@@ -39,6 +39,8 @@ from pytorchfi.FI_Weights import DatasetSampling
 
 from torch.utils.data import DataLoader, Subset
 
+import multiprocessing as mp
+
 logger = def_logger.getChild(__name__)
 # comment this line, otherwise the fault injections will collapse due to leaking memory produced by 'file_system
 # torch.multiprocessing.set_sharing_strategy('file_system')
@@ -105,9 +107,18 @@ def train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch,
             raise ValueError('The training loop was broken due to loss = {}'.format(loss))
 
 
+def update_report_shared_dict(shared_dict_pred,shared_dict_clas,shared_dict_target,index,output,target,topk=(1,)):
+    maxk=max(topk)        
+    pred, clas=output.cpu().topk(maxk,1,True,True)
+    shared_dict_pred[index]=pred.tolist()
+    shared_dict_clas[index]=clas.tolist()
+    shared_dict_target[index]=target.cpu().tolist()
+
+
 @torch.inference_mode()
-def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_eval=False,
-             log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup:FI_manager = None):
+def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, 
+            no_dp_eval, log_freq, title, header, fsim_enabled, Fsim_setup:FI_manager):
+            #no_dp_eval=False, log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup = None):
     model = model_wo_ddp.to(device)
     if distributed and not no_dp_eval:
         model = DistributedDataParallel(model_wo_ddp, device_ids=device_ids)
@@ -124,18 +135,24 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
     analyzable = check_if_analyzable(model_wo_ddp)
     metric_logger = MetricLogger(delimiter='  ')
     im=0
+
     for image, target in metric_logger.log_every(data_loader, log_freq, header):
         if isinstance(image, torch.Tensor):
             image = image.to(device, non_blocking=True)
+            #image = image.to(device)
 
         if isinstance(target, torch.Tensor):
             target = target.to(device, non_blocking=True)
+            #target = target.to(device)
 
         if fsim_enabled==True:
             output = model(image)
-            Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
+
+            #Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
+            Fsim_setup.FI_report.update_report_shared_dict(im,output,target,topk=(1,5))
         else:
             output = model(image)
+
         acc1, acc5 = compute_accuracy(output, target, topk=(1, 5))
         # FIXME need to take into account that the datasets
         # could have been padded in distributed setup
@@ -181,7 +198,7 @@ def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, de
             bottleneck_updated = True
 
         train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch, log_freq)
-        val_top1_accuracy = evaluate(student_model, training_box.val_data_loader, device, device_ids, distributed,
+        val_top1_accuracy = evaluate( student_model, training_box.val_data_loader, device, device_ids, distributed,
                                      no_dp_eval=no_dp_eval, log_freq=log_freq, header='Validation:')
         if val_top1_accuracy > best_val_top1_accuracy and is_main_process():
             logger.info('Best top-1 accuracy: {:.4f} -> {:.4f}'.format(best_val_top1_accuracy, val_top1_accuracy))
@@ -207,7 +224,7 @@ def main(args):
     # distributed, device_ids = init_distributed_mode(args.world_size, args.dist_url)
     distributed, device_ids = False, None
     logger.info(args)
-    
+
     cudnn.enabled=True
     # cudnn.benchmark = True
     cudnn.deterministic = True
@@ -260,10 +277,10 @@ def main(args):
     if check_if_analyzable(student_model):
         student_model.activate_analysis()
         
-    test_batch_size=config['test']['test_data_loader']['batch_size']
+    test_batch_size=32#config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
-    test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,5)
+    test_num_workers=8#config['test']['test_data_loader']['num_workers']
+    subsampler = DatasetSampling(test_data_loader.dataset,1)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -282,9 +299,13 @@ def main(args):
         FI_setup=FI_manager(full_log_path,"ckpt_FI.json","fsim_report.csv")
 
         # 2. Run a fault free scenario to generate the golden model
+
         FI_setup.open_golden_results("Golden_results")
-        evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        evaluate(student_model, dataloader, device, device_ids, distributed, 
+                no_dp_eval, log_freq, '[Student: {}]'.format(student_model_config['name']), 'Golden', True, FI_setup) 
+                #no_dp_eval=False, log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup = None):
+        #FI_setup.FI_report._report_dictionary=FI_setup.FI_report._shared_dict.copy()
+        FI_setup.FI_report.merge_shared_report() 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections
@@ -298,23 +319,81 @@ def main(args):
         FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
         FI_setup.load_check_point()
 
+        #signal.signal(signal.SIGALRM, handler)      
+        
         # 5. Execute the fault injection campaign
+        mp.set_start_method('spawn',force=True)
+        
+        with mp.Manager() as manager:
+
+            for fault,k in FI_setup.iter_fault_list():
+                logger.info(f"index {k}: start")
+                # 5.1 inject the fault in the model
+                FI_setup.FI_report.shared_dict_pred=manager.dict()
+                FI_setup.FI_report.shared_dict_clas=manager.dict()
+                FI_setup.FI_report.shared_dict_target=manager.dict()
+                FI_setup.FI_framework.bit_flip_weight_inj(fault)
+                FI_setup.open_faulty_results(f"F_{k}_results") 
+                #signal.alarm(30)  
+                # 5.2 run the inference with the faulty model          
+                Process = mp.Process(target=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
+                    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,))
+                try:                       
+                    Process.start()
+                    Process.join(60)
+                    #print(shared_dict_pred,shared_dict_clas,shared_dict_target)
+                    if Process.is_alive():                        
+                        Process.kill()
+                        Process.join()
+                        logger.info(f"Exception error: Timeout")   
+                        logger.info(f"index {k}: The DNN inference got stuck")                   
+                        #print(FI_setup.FI_report._shared_dict)
+                    # evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                    #     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup) 
+                    FI_setup.FI_report.merge_shared_report()
+                except Exception as Error:  
+                    if Process.is_alive():                        
+                        Process.kill()
+                        Process.join()
+                    FI_setup.FI_report.merge_shared_report()                  
+                    msg=f"Exception error: {Error}"
+                    logger.info(msg)
+                    logger.info(f"index {k}: an unexpected error happened during inference")                            
+                # 5.3 Report the results of the fault injection campaign            
+                FI_setup.parse_results()
+            FI_setup.terminate_fsim()
+            
+        """
         for fault,k in FI_setup.iter_fault_list():
+            logger.info(f"index {k}: start")
             # 5.1 inject the fault in the model
             FI_setup.FI_framework.bit_flip_weight_inj(fault)
-            FI_setup.open_faulty_results(f"F_{k}_results")  
+            logger.info(f"index {k}: fault injected succesfully")
+            FI_setup.open_faulty_results(f"F_{k}_results") 
+            logger.info(f"index {k}: faulty report created succesfully") 
+              
+            signal.alarm(30)  
             try:   
                 # 5.2 run the inference with the faulty model 
+                logger.info(f"index {k}: inference started")                              
                 evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
                     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup) 
+                logger.info(f"index {k}: Inference completed")
+
+            except TimeOutException as exc:
+                msg=f"Exception error: {exc}"
+                logger.info(msg)
+                logger.info(f"index {k}: an Timeout")                            
             except Exception as Error:
                 msg=f"Exception error: {Error}"
                 logger.info(msg)
+                logger.info(f"index {k}: an unexpected error happened during inference")            
+
             # 5.3 Report the results of the fault injection campaign            
             FI_setup.parse_results()
         FI_setup.terminate_fsim()
-
-
+        """
 if __name__ == '__main__':
+
     argparser = get_argparser()
     main(argparser.parse_args())

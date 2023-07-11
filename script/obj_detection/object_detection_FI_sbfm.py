@@ -31,8 +31,8 @@ from sc2bench.models.detection.base import check_if_updatable_detection_model
 from sc2bench.models.detection.registry import load_detection_model
 from sc2bench.models.detection.wrapper import get_wrapped_detection_model
 
-from pytorchfi.FI_Weights_detection import FI_manager 
-from pytorchfi.FI_Weights_detection import DatasetSampling 
+from pytorchfi.FI_Weights_detection_v2 import FI_manager 
+from pytorchfi.FI_Weights_detection_v2 import DatasetSampling 
 
 from torch.utils.data import DataLoader, Subset
 
@@ -171,7 +171,6 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         # len = 1
 
         # print(f'*********2: {type(outputs)}')
-        # print(f'*******3: {outputs}')
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
         # print(f'outputs: {outputs}')
@@ -179,8 +178,6 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         # type(outputs) = list of dictionary of tensors
         # len = 1
         # print(f'*********4: {type(outputs)}')
-        if fsim_enabled:
-            Fsim_setup.FI_report.update_detection_report(im,outputs,targets)
 
         model_time = time.time() - model_time
 
@@ -189,10 +186,15 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        # if im > 50:
-        #     break
+        if fsim_enabled:
+            Fsim_setup.FI_report.update_detection_report(im,outputs,targets)
+        # how to handle the case in which the faulty model detects less boxes than expected?
+        if im > 3:
+            break
 
         im += 1
+    # fuori dal for si può salvare coco evaluator, per poi salvarlo come variabile di classe in FI_weights
+    # e usarlo per poi fare coco_evaluator.compute()
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

@@ -131,14 +131,21 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
 
         model_time = time.time()
         outputs = model(sample_batch)
-        print(f'prev_outputs: {outputs}')
+        # print(f'prev_outputs: {outputs}')
         model_time = time.time() - model_time
         outputs = outputs['out']
+        torch.set_printoptions(profile="full")
+        print(f'outputs.argmax(1): {outputs.argmax(1)}')
+        print(f'outputs.argmax(1).shape: {outputs.argmax(1).shape}')
+        print(f'targets: {targets}')
+        print(f'targets.shape: {targets.shape}')
         print(f'outputs.argmax(1).flatten(): {outputs.argmax(1).flatten()}')
+        print(f'outputs.argmax(1).flatten().shape: {outputs.argmax(1).flatten().shape}')
         print(f'targets.flatten(): {targets.flatten()}')
+        print(f'targets.flatten().shape: {targets.flatten().shape}')
         
         if fsim_enabled:
-            Fsim_setup.FI_report.update_segmentation_report(im,outputs,targets)
+            Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1).flatten(),targets.flatten())
 
         evaluator_time = time.time()
         seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())
@@ -285,8 +292,8 @@ def main(args):
 
         # 2. Run a fault free scenario to generate the golden model
         FI_setup.open_golden_results("Golden_results")
-        # evaluate(student_model, dataloader, device, device_ids, distributed, num_classes, no_dp_eval=no_dp_eval,
-        #         log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        evaluate(student_model, dataloader, device, device_ids, distributed, num_classes, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections

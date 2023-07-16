@@ -188,9 +188,9 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
         if fsim_enabled:
             Fsim_setup.FI_report.update_detection_report(im,outputs,targets)
-        # how to handle the case in which the faulty model detects less boxes than expected?
-        if im > 3:
-            break
+        
+        # if im > 3:
+        #     break
 
         im += 1
     # fuori dal for si può salvare coco evaluator, per poi salvarlo come variabile di classe in FI_weights

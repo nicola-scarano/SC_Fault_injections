@@ -29,15 +29,15 @@ def merge_fsim_reports(path):
         fsim_report= pd.read_csv(fsim_report_file,index_col=[0]) 
 
         # index=((fsim_report['gold_ACC@1'].isna()==False) | (fsim_report['gold_ACC@k'].isna()==False))
-        index=(fsim_report['gold_iou@1'].isna()==False)
-        fsim_report=fsim_report.loc[index]
+        # index=(fsim_report['gold_iou@1'].isna()==False)
+        # fsim_report=fsim_report.loc[index]
         full_reportfs=pd.concat([fault_list,fsim_report],axis=1)
         full_reportfs.to_csv(os.path.join(path,"fsim_full_report.csv"))
 
         flist= fault_list 
         df_pivot = pd.read_csv(os.path.join(path,"Misclassified_images_report.csv"),index_col=[0]) 
-        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID', 'G_Target'], columns='Pred_idx', 
-                          values=['G_lab', 'F_lab', 'f_conf_score', 'g_conf_score'])
+        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID'], columns='Pred_idx', 
+                          values=['G_lab', 'F_lab','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
         df_pivot.columns = [f'{col}{int(idx)}' for col, idx in df_pivot.columns]
         df_pivot = df_pivot.reset_index()
         

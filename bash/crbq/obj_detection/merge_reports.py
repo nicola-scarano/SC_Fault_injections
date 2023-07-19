@@ -10,7 +10,7 @@ def merge_fsim_reports(path):
         items = os.listdir(path)
         csvfiles = [item for item in items if "F_" in item]  
         if len(csvfiles)>0:
-            if (os.path.exists(os.path.join(path,"Misclassified_images_report.csv"))):
+            if (os.path.exists(os.path.join(path,"Faulty_boxes_report.csv"))):
                 for rep_per_fault in csvfiles:
                     os.remove(os.path.join(path,rep_per_fault))
             else:
@@ -18,7 +18,7 @@ def merge_fsim_reports(path):
                 for rep_per_fault in csvfiles:
                     fault_list= pd.read_csv(os.path.join(path,rep_per_fault),index_col=[0]) 
                     full_report=pd.concat([full_report,fault_list],axis=0, ignore_index=True, sort=False)                
-                full_report.to_csv(os.path.join(path,"Misclassified_images_report.csv"))   
+                full_report.to_csv(os.path.join(path,"Faulty_boxes_report.csv"))   
 
                 for rep_per_fault in csvfiles:
                     os.remove(os.path.join(path,rep_per_fault))         
@@ -35,14 +35,16 @@ def merge_fsim_reports(path):
         full_reportfs.to_csv(os.path.join(path,"fsim_full_report.csv"))
 
         flist= fault_list 
-        df_pivot = pd.read_csv(os.path.join(path,"Misclassified_images_report.csv"),index_col=[0]) 
-        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID'], columns='Pred_idx', 
-                          values=['G_lab', 'F_lab','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
-        df_pivot.columns = [f'{col}{int(idx)}' for col, idx in df_pivot.columns]
+        df_pivot = pd.read_csv(os.path.join(path,"Faulty_boxes_report.csv"),index_col=[0]) 
+        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID', 'Pred_idx', 'G_lab'],
+                          values=['F_lab','T_count','F_count','G_count','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
+        # df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID'], columns='Pred_idx', 
+        #                   values=['G_lab','F_lab','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
+        # df_pivot.columns = [f'{col}{int(idx)}' for col, idx in df_pivot.columns]
         df_pivot = df_pivot.reset_index()
         
-        #df_pivot = df_pivot[['FaultID','imID','Pred_idx','G_pred','F_pred','G_clas','F_clas','G_Target']]
-        #df_pivot.to_csv(os.path.join(args.path,"Misclassified_images_report.csv")) 
+        # df_pivot = df_pivot[['FaultID','imID','Pred_idx','G_pred','F_pred','G_clas','F_clas','G_Target']]
+        # df_pivot.to_csv(os.path.join(args.path,"Faulty_boxes_report.csv")) 
         
         FaultID=[f"F_{item}_results" for item in range(len(flist))]
         FaultID_col=pd.DataFrame({"FaultID":FaultID})
@@ -53,7 +55,7 @@ def merge_fsim_reports(path):
             left.reset_index(), right.reset_index(), on=["FaultID"], how="inner"
         ).set_index(["FaultID","imID"])
         result=result.reset_index()
-        result.to_csv(os.path.join(path,"Misclassified_images_report.csv"))
+        result.to_csv(os.path.join(path,"Faulty_boxes_report.csv"))
         print(f"merged {path}")
 
 

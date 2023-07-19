@@ -145,7 +145,7 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         print(f'targets.flatten().shape: {targets.flatten().shape}')
         
         if fsim_enabled:
-            Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1).flatten(),targets.flatten())
+            Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1).flatten(),targets.flatten(), num_classes)
 
         evaluator_time = time.time()
         seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())

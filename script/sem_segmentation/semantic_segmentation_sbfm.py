@@ -144,18 +144,15 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         # print(f'targets.flatten(): {targets.flatten()}')
         # print(f'targets.flatten().shape: {targets.flatten().shape}')
 
-        flattened_output = outputs.argmax(1).flatten()
-        flattened_target = targets.flatten()
-
         if fsim_enabled:
-            Fsim_setup.FI_report.update_segmentation_report(im,flattened_output,flattened_target, num_classes)
+            Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1),targets, num_classes)
 
         evaluator_time = time.time()
-        seg_evaluator.update(flattened_target, flattened_output)
+        seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        # if im > 10:
-        #     break
+        if im > 3:
+            break
         im += 1
 
     # gather the stats from all processes

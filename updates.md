@@ -1,4 +1,4 @@
-## todo list
+
 
 - i'm not taking into account the case in which the target is empty and the model is still predictin something, i am just discarding it. (it is ok, because the critical case is basically when the targect expects something but the faulty model doesn't predict anything)
 
@@ -9,3 +9,14 @@
 
 - Each record of F_*_results.csv is saved for each bounding box of the golden model
 - should i consider a different file for the counters of bounding boxes? Notice that it is done by image
+
+## todo list
+- Far ripartire le diverse simulazioni con altri layer
+
+- Quando i csv saranno completi, voglio estrarre solo le bitmask corrispondenti al bit 30
+- vedere cosa si può fare
+- Cercare di giustificare perchè è quello il punto più critico
+
+- Rigenerare tutti i grafici
+
+- dare un senso al clustering associandolo ad ogni configurazione.

@@ -120,9 +120,9 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
     seg_evaluator = SegEvaluator(num_classes)
     
     im = 0
-    print('out for')
+    # print('out for')
     for sample_batch, targets in metric_logger.log_every(data_loader, log_freq, header):
-        print('in for')
+        # print('in for')
         if isinstance(sample_batch, torch.Tensor):
             sample_batch = sample_batch.to(device)
 
@@ -135,24 +135,27 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         model_time = time.time() - model_time
         outputs = outputs['out']
         torch.set_printoptions(profile="full")
-        print(f'outputs.argmax(1): {outputs.argmax(1)}')
-        print(f'outputs.argmax(1).shape: {outputs.argmax(1).shape}')
-        print(f'targets: {targets}')
-        print(f'targets.shape: {targets.shape}')
-        print(f'outputs.argmax(1).flatten(): {outputs.argmax(1).flatten()}')
-        print(f'outputs.argmax(1).flatten().shape: {outputs.argmax(1).flatten().shape}')
-        print(f'targets.flatten(): {targets.flatten()}')
-        print(f'targets.flatten().shape: {targets.flatten().shape}')
-        
+        # print(f'outputs.argmax(1): {outputs.argmax(1)}')
+        # print(f'outputs.argmax(1).shape: {outputs.argmax(1).shape}')
+        # print(f'targets: {targets}')
+        # print(f'targets.shape: {targets.shape}')
+        # print(f'outputs.argmax(1).flatten(): {outputs.argmax(1).flatten()}')
+        # print(f'outputs.argmax(1).flatten().shape: {outputs.argmax(1).flatten().shape}')
+        # print(f'targets.flatten(): {targets.flatten()}')
+        # print(f'targets.flatten().shape: {targets.flatten().shape}')
+
+        flattened_output = outputs.argmax(1).flatten()
+        flattened_target = targets.flatten()
+
         if fsim_enabled:
-            Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1).flatten(),targets.flatten(), num_classes)
+            Fsim_setup.FI_report.update_segmentation_report(im,flattened_output,flattened_target, num_classes)
 
         evaluator_time = time.time()
-        seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())
+        seg_evaluator.update(flattened_target, flattened_output)
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        if im > 10:
-            break
+        # if im > 10:
+        #     break
         im += 1
 
     # gather the stats from all processes
@@ -161,8 +164,16 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
     if analyzable and model_wo_ddp.activated_analysis:
         model_wo_ddp.summarize()
     return seg_evaluator
-
-
+        # print(f'outputs.argmax(1): {outputs.argmax(1)}')
+        # print(f'outputs.argmax(1).shape: {outputs.argmax(1).shape}')
+        # print(f'targets: {targets}')
+        # print(f'targets.shape: {targets.shape}')
+        # print(f'outputs.argmax(1).flatten(): {outputs.argmax(1).flatten()}')
+        # print(f'outputs.argmax(1).flatten().shape: {outputs.argmax(1).flatten().shape}')
+        # print(f'targets.flatten(): {targets.flatten()}')
+        # print(f'targets.flatten().shape: {targets.flatten().shape}')
+        # if fsim_enabled:
+        #     Fsim_setup.FI_report.update_segmentation_report(im,outputs.argmax(1).flatten(),targets.flatten(), num_classes)
 def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, device_ids, distributed, config, args):
     logger.info('Start training')
     train_config = config['train']

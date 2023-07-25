@@ -8,20 +8,20 @@ def merge_fsim_reports(path):
     pd.set_option('mode.use_inf_as_na', True)   
     if path:
         items = os.listdir(path)
-        csvfiles = [item for item in items if "F_" in item]  
+        csvfiles = [item for item in items if "F_" in item and ".csv" in item]  
         if len(csvfiles)>0:
-            if (os.path.exists(os.path.join(path,"Faulty_boxes_report.csv"))):
-                for rep_per_fault in csvfiles:
-                    os.remove(os.path.join(path,rep_per_fault))
-            else:
-                full_report = pd.DataFrame()
-                for rep_per_fault in csvfiles:
-                    fault_list= pd.read_csv(os.path.join(path,rep_per_fault),index_col=[0]) 
-                    full_report=pd.concat([full_report,fault_list],axis=0, ignore_index=True, sort=False)                
-                full_report.to_csv(os.path.join(path,"Faulty_boxes_report.csv"))   
+            # if (os.path.exists(os.path.join(path,"Faulty_boxes_report.csv"))):
+            #     for rep_per_fault in csvfiles:
+            #         os.remove(os.path.join(path,rep_per_fault))
+            # else:
+            full_report = pd.DataFrame()
+            for rep_per_fault in csvfiles:
+                fault_list= pd.read_csv(os.path.join(path,rep_per_fault),index_col=[0]) 
+                full_report=pd.concat([full_report,fault_list],axis=0, ignore_index=True, sort=False)                
+            full_report.to_csv(os.path.join(path,"Faulty_boxes_report.csv"))   
 
-                for rep_per_fault in csvfiles:
-                    os.remove(os.path.join(path,rep_per_fault))         
+            # for rep_per_fault in csvfiles:
+            #     os.remove(os.path.join(path,rep_per_fault))         
         
         fault_list_file=os.path.join(path,"fault_list.csv")
         fsim_report_file=os.path.join(path,"fsim_report.csv")
@@ -36,8 +36,8 @@ def merge_fsim_reports(path):
 
         flist= fault_list 
         df_pivot = pd.read_csv(os.path.join(path,"Faulty_boxes_report.csv"),index_col=[0]) 
-        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID', 'Pred_idx', 'G_lab'],
-                          values=['F_lab','T_count','F_count','G_count','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
+        df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID', 'G_lab','f_bb', 'g_bb'],
+                          values=['F_lab','T_count','F_count','G_count','iou score', 'area_ratio','f_candidate_conf', 'G_score', 'confidence_covered'])
         # df_pivot = df_pivot.pivot_table(index=['FaultID', 'imID'], columns='Pred_idx', 
         #                   values=['G_lab','F_lab','iou score', 'area_ratio','f_candidate_conf', 'G_score'])
         # df_pivot.columns = [f'{col}{int(idx)}' for col, idx in df_pivot.columns]

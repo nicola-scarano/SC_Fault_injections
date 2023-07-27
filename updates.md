@@ -10,7 +10,7 @@
 - Each record of F_*_results.csv is saved for each bounding box of the golden model
 - should i consider a different file for the counters of bounding boxes? Notice that it is done by image
 
-## todo list
+
 - Far ripartire le diverse simulazioni con altri layer
 
 - Quando i csv saranno completi, voglio estrarre solo le bitmask corrispondenti al bit 30
@@ -20,3 +20,15 @@
 - Rigenerare tutti i grafici
 
 - dare un senso al clustering associandolo ad ogni configurazione.
+
+
+- come funziona la fault injection? e che risultato mi aspetto sui pesi?
+- come dovrebbero essere cambiati?
+- cercare un paper che descrive come dovrebbero essere i pesi di una rete neurale che funziona bene e una che funziona male.
+
+
+
+Avendo fatto delle ricerche ho scoperto che dalla distribuzione dei pesi difficilmente si riesce a capire come la rete viene impattata. Di base, se la rete ha certi risultati con una specifica distribuzione di pesi, con un'altra distribuzione la rete farà cose diverse. Vale la pena in ogni caso andare a vedere  come cambia la distribuzione. 
+
+## todo list
+- guardare NVbit 

@@ -291,7 +291,7 @@ def main(args):
     test_batch_size=1
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,1)
+    subsampler = DatasetSampling(test_data_loader.dataset,5)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -326,44 +326,44 @@ def main(args):
         for fault,k in tqdm(FI_setup.iter_fault_list()):
 
             # 5.1 inject the fault in the model
-            # start = time.time()
+            start = time.time()
             FI_setup.FI_framework.bit_flip_weight_inj(fault)
-            # end = time.time()
-            # time1 = end-start
-            # print(f'bit_flip_weight_inj: {time1}')
+            end = time.time()
+            time1 = end-start
+            print(f'bit_flip_weight_inj: {time1}')
 
-            # start = time.time()
+            start = time.time()
             FI_setup.open_faulty_results(f"F_{k}_results")
-            # end = time.time()
-            # time2 = end-start
-            # print(f'open_faulty_results: {time2}')
+            end = time.time()
+            time2 = end-start
+            print(f'open_faulty_results: {time2}')
 
             try:
                 # 5.2 run the inference with the faulty model 
-                # start = time.time()
+                start = time.time()
                 evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, num_classes, no_dp_eval=no_dp_eval,
                     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True, Fsim_setup=FI_setup) 
-                # end = time.time()    
-                # time3 = end-start   
-                # print(f'evaluate: {time3}')
+                end = time.time()    
+                time3 = end-start   
+                print(f'evaluate: {time3}')
 
             except Exception as Error:
                 msg=f"Exception error: {Error}"
                 logger.info(msg)
 
             # 5.3 Report the results of the fault injection campaign 
-            # start = time.time()      
+            start = time.time()      
             FI_setup.parse_results()
-            # end = time.time()
-            # time4 = end-start 
-            # print(f'parse_results: {time4}')
+            end = time.time()
+            time4 = end-start 
+            print(f'parse_results: {time4}')
             # break
 
-        # start = time.time()
+        start = time.time()
         FI_setup.terminate_fsim()
-        # end = time.time()
-        # time5 = end-start 
-        # print(f'terminate_fsim: {time5}')
+        end = time.time()
+        time5 = end-start 
+        print(f'terminate_fsim: {time5}')
 
 
 if __name__ == '__main__':

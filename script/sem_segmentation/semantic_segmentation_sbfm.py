@@ -151,8 +151,8 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, num_cla
         seg_evaluator.update(targets.flatten(), outputs.argmax(1).flatten())
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-        if im > 3:
-            break
+        # if im > 3:
+        #     break
         im += 1
 
     # gather the stats from all processes
@@ -229,10 +229,18 @@ def main(args):
         setup_log_file(os.path.expanduser(log_file_path))
 
     world_size = args.world_size
-    distributed, device_ids = init_distributed_mode(world_size, args.dist_url)
+    # distributed, device_ids = init_distributed_mode(world_size, args.dist_url)
+    distributed, device_ids = False, None
+
     logger.info(args)
-    cudnn.benchmark = True
+    
     cudnn.deterministic = True
+    # The flag below controls whether to allow TF32 on matmul. This flag defaults to False
+    # in PyTorch 1.12 and later.
+    torch.backends.cuda.matmul.allow_tf32 = True
+    # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
+    cudnn.allow_tf32 = True
+
     set_seed(args.seed)
     config = yaml_util.load_yaml_file(os.path.expanduser(args.config))
     if args.json is not None:

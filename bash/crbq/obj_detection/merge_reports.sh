@@ -3,7 +3,7 @@
 source ~/miniconda3/bin/activate
 conda deactivate
 
-cd  /home/gesposito/sc2-benchmark
+cd  /home/g.esposito/sc2-benchmark
 
 conda activate sc2-benchmark
 

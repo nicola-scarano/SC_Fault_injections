@@ -3,7 +3,7 @@
 # 1 Activate the virtual environment
 source ~/miniconda3/bin/activate sc2-benchmark
 
-cd  /home/gesposito/sc2-benchmark
+cd  /home/g.esposito/sc2-benchmark
 
 
 # which python
@@ -44,7 +44,7 @@ if [ $target_config -eq 77 ]; then
                 --device cpu\
                 --log ${Sim_dir}/log/pascal_voc2012/supervised_compression/ghnd-bq/deeplabv3_resnet50-bq1ch_from_deeplabv3_resnet50.log\
                 -test_only\
-                --num_classes 10\
+                --num_classes 21\
                 --fsim_config ${Sim_dir}/Fault_descriptor.yaml > ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stdo.log 2> ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stde.log
 else
         cp ${global_PWD}/SC_Fault_injections/configs/pascal_voc2012/supervised_compression/ghnd-bq/deeplabv3_resnet50-bq${target_config}ch_from_deeplabv3_resnet50.yaml ${Sim_dir}
@@ -59,7 +59,7 @@ else
                 --device cpu\
                 --log ${Sim_dir}/log/pascal_voc2012/supervised_compression/ghnd-bq/deeplabv3_resnet50-bq${target_config}ch_from_deeplabv3_resnet50.log\
                 -test_only\
-                --num_classes 10\
+                --num_classes 21\
                 --fsim_config ${Sim_dir}/Fault_descriptor.yaml > ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stdo.log 2> ${global_PWD}/${DIR}/cnf${target_config}_lyr${start_layer}_stde.log
 
 fi

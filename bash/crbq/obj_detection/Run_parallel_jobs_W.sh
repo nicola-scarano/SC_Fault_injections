@@ -10,7 +10,7 @@ target_layer="$2"
 
 mkdir -p ${global_PWD}/${DIR}
 
-input_args=(1 2) # 3 6 9 12 77)
+input_args=(1 2 3 6 9 12 77)
 
 array_size=${#input_args[@]}
 

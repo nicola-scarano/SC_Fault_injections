@@ -1,10 +1,20 @@
 #!/bin/bash
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
+#SBATCH --partition=cuda
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks-per-node=8
+#SBATCH --job-name=WeightsSplit_obj
+#SBATCH --mail-type=ALL
+
+
 
 # 1 Activate the virtual environment
 source ~/miniconda3/bin/activate sc2-benchmark
 
 cd  /home/gesposito/sc2-benchmark
 
+module load nvidia/cudasdk/10.1
 
 # which python
 # which pip
@@ -21,14 +31,14 @@ global_PWD="$PWD"
 echo ${CUDA_VISIBLE_DEVICES}
 
 
-job_id=0
+job_id="$SLURM_JOB_ID"
 
 target_config="$1"
 target_layer="$2"
 DIR="$3"
 
 Sim_dir=${global_PWD}/${DIR}/cnf${target_config}_lyr${target_layer}_JOBID${job_id}_W
-mkdir -p ${Sim_dir}
+mkdir -p ${Sim_dir} 
 
 
 if [ $target_config -eq 77 ]; then 
@@ -41,7 +51,7 @@ if [ $target_config -eq 77 ]; then
 
         python ${global_PWD}/SC_Fault_injections/script/sem_segmentation/semantic_segmentation_sbfm.py -student_only \
                 --config ${Sim_dir}/deeplabv3_resnet50-bq1ch_from_deeplabv3_resnet50.yaml\
-                --device cpu\
+                --device cuda\
                 --log ${Sim_dir}/log/pascal_voc2012/supervised_compression/ghnd-bq/deeplabv3_resnet50-bq1ch_from_deeplabv3_resnet50.log\
                 -test_only\
                 --num_classes 21\
@@ -56,7 +66,7 @@ else
         
         python ${global_PWD}/SC_Fault_injections/script/sem_segmentation/semantic_segmentation_sbfm.py -student_only \
                 --config ${Sim_dir}/deeplabv3_resnet50-bq${target_config}ch_from_deeplabv3_resnet50.yaml\
-                --device cpu\
+                --device cuda\
                 --log ${Sim_dir}/log/pascal_voc2012/supervised_compression/ghnd-bq/deeplabv3_resnet50-bq${target_config}ch_from_deeplabv3_resnet50.log\
                 -test_only\
                 --num_classes 21\
@@ -68,16 +78,3 @@ echo
 echo "All done. Checking results:"
 
 
-
-
-# python script/task/object_detection.py -student_only --device cpu -test_only \
-# --config configs/pascal_voc2012/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml \
-# --log log/pascal_voc2012/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.txt
-
-
-# python /home/gesposito/sc2-benchmark/SC_Fault_injections/script/obj_detection/semantic_segmentation_sbfm.py -student_only \
-#         --config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.yaml\
-#         --device cpu\
-#         --log /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/log/pascal_voc2012/supervised_compression/ghnd-bq/faster_rcnn_resnet50-bq1ch_fpn_from_faster_rcnn_resnet50_fpn.log\
-#         -test_only\
-#         --fsim_config /home/gesposito/sc2-benchmark/FSIM_W_local_obj/cnf1_lyr0_JOBID0_W/Fault_descriptor.yaml

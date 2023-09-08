@@ -5,7 +5,9 @@ import json
 import os
 import time
 import logging
+import numpy as np
 from tqdm import tqdm
+from collections import Counter
 
 import torch
 from torch import distributed as dist
@@ -32,9 +34,11 @@ from sc2bench.models.detection.registry import load_detection_model
 from sc2bench.models.detection.wrapper import get_wrapped_detection_model
 
 from pytorchfi.FI_Weights_detection_v2 import FI_manager 
-from pytorchfi.FI_Weights_detection_v2 import DatasetSampling 
+from pytorchfi.FI_Weights_detection_v2 import DatasetSamplingByShape
 
 from torch.utils.data import DataLoader, Subset
+
+
 
 logger = def_logger.getChild(__name__)
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -194,8 +198,6 @@ def evaluate(model_wo_ddp, data_loader, iou_types, device, device_ids, distribut
         #     break
 
         im += 1
-    # fuori dal for si può salvare coco evaluator, per poi salvarlo come variabile di classe in FI_weights
-    # e usarlo per poi fare coco_evaluator.compute()
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -336,14 +338,16 @@ def main(args):
     test_batch_size=1
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,1)
-    index_dataset=subsampler.listindex()
+    subsampler = DatasetSamplingByShape(test_data_loader.dataset,torch.Size([3,612,612]), max_idx=4)
+    # logger.info(f'subsampler: {subsampler}')
+    # start_list = time.time()
+    index_dataset=subsampler.listindex_by_shape()
+    # end_list = time.time()
+    # logger.info(f'index_dataset: {end_list-start_list}')
     data_subset=Subset(test_data_loader.dataset, index_dataset)
 
-    y_shapes = [data[0].shape[1] for data in data_subset]
-    x_shapes = [data[0].shape[2] for data in data_subset]
-    min_y = min(y_shapes)
-    min_x = min(x_shapes)
+    for data in data_subset:
+        logger.info(data[0].shape)
 
 
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -368,7 +372,7 @@ def main(args):
         FI_setup.FI_framework.create_fault_injection_model(device=device,
                                             model=student_model,
                                             batch_size=1,
-                                            input_shape=[3,min_y,min_x], # input images has different sizes
+                                            input_shape=[3,612,612], # input images has different sizes
                                             layer_types=[torch.nn.Conv2d, torch.nn.Linear],
                                             Neurons=True)
         

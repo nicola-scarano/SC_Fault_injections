@@ -338,7 +338,7 @@ def main(args):
     test_batch_size=1
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSamplingByShape(test_data_loader.dataset,torch.Size([3,612,612]), max_idx=4)
+    subsampler = DatasetSamplingByShape(test_data_loader.dataset,torch.Size([3,612,612]), max_idx=100)
     # logger.info(f'subsampler: {subsampler}')
     # start_list = time.time()
     index_dataset=subsampler.listindex_by_shape()

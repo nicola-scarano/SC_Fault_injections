@@ -488,13 +488,15 @@ class extract_statistics_nvbit:
                 tmpIn1 = np.load(filename1)
                 tmpIn2 = np.concatenate([tmpIn1,embeddings_input])
                 np.save(filename1,tmpIn2)
-                tmpOut1 = np.load(filename1)
+            else:
+                np.save(filename1,embeddings_input)
+
+            if os.path.exists(filename2):
+                tmpOut1 = np.load(filename2)
                 tmpOut2 = np.concatenate([tmpOut1,embeddings_output])
                 np.save(filename2,tmpOut2)
             else:
-                np.save(filename1,embeddings_input)
                 np.save(filename2,embeddings_output)
-
         self.layer_embedding_list_input = {}
         self.layer_embedding_list_output = {}
 

@@ -371,8 +371,8 @@ class extract_statistics_nvbit:
         handles = []
         for names, layer in model.named_children():
             # leaf node
-            print(layer.__class__.__name__)
-            print(type(layer))
+            #print(layer.__class__.__name__)
+            #print(type(layer))
             name = f"layer-id-{self.layer_id}-{layer.__class__.__name__}" # just the name i want to add to the layer
             if list(layer.children()) == [] or (any([True for target in self.valid_layers if isinstance(layer,target)])):
                 if "all" in self.layer_types:
@@ -495,7 +495,10 @@ class extract_statistics_nvbit:
                 np.save(filename1,embeddings_input)
                 np.save(filename2,embeddings_output)
 
-            """
+        self.layer_embedding_list_input = {}
+        self.layer_embedding_list_output = {}
+
+        """
             ins = torch.from_numpy(embeddings_input)
             out = torch.from_numpy(embeddings_output)
 
@@ -553,7 +556,7 @@ class extract_statistics_nvbit:
 
             with open(os.path.join(dir2,f"{layer_id}.json"), "w") as ooutfile:
                 json.dump(out_dict, ooutfile)
-            """
+        """
 
 
 

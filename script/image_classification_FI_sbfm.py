@@ -40,11 +40,62 @@ from pytorchfi.FI_Weights import DatasetSampling
 from torch.utils.data import DataLoader, Subset
 
 import multiprocessing as mp
+from multiprocessing import TimeoutError
+import subprocess
+import psutil
+import traceback
+import gc
+import requests
+import sys
+
 
 logger = def_logger.getChild(__name__)
 # comment this line, otherwise the fault injections will collapse due to leaking memory produced by 'file_system
 # torch.multiprocessing.set_sharing_strategy('file_system')
 import logging
+
+
+
+def send_to_telegram(message):
+
+    apiToken = '6152839244:AAGam9_rwCHyo5OyLswcMuKreUfERMDbyjU'
+    chatID = '665841436'
+    apiURL = f'https://api.telegram.org/bot{apiToken}/sendMessage'
+
+    try:
+        response = requests.post(apiURL, json={'chat_id': chatID, 'text': message})
+        print(response.text)
+    except Exception as e:
+        print(e)
+
+
+
+class mpProcess(mp.Process):
+    def __init__(self, *args, **kwargs):
+        mp.Process.__init__(self, *args, **kwargs)
+        self._pconn, self._cconn = mp.Pipe()
+        self._exception = None
+
+    def run(self):
+        try:
+            mp.Process.run(self)
+            self._cconn.send(None)
+        except Exception as e:
+            tb = traceback.format_exc()
+            self._cconn.send((e, tb))
+            # raise e  # You can still rise this exception if you need to
+
+    @property
+    def exception(self):
+        if self._pconn.poll():
+            self._exception = self._pconn.recv()
+        return self._exception
+
+
+def cmdline(command):
+    process = subprocess.Popen(args=command, stdout=subprocess.PIPE, shell=True)
+    return process.communicate()[0]
+
 
 def get_argparser():
     parser = argparse.ArgumentParser(description='Supervised compression for image classification tasks')
@@ -289,9 +340,12 @@ def main(args):
     #conf_fault_dict=config['fault_info']['weights']
     #name_config=f"FSIM_logs/{name_config}_weights_{conf_fault_dict['layer'][0]}"
     if args.fsim_config:
+
+        myhost = os.uname()[1]
         fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
         conf_fault_dict=fsim_config_descriptor['fault_info']['weights']
         cwd=os.getcwd() 
+        send_to_telegram(f"{myhost}: WeightsFSIM: layer: {conf_fault_dict['layer'][0]} Simulation_started!..")
         # student_model.deactivate_analysis()
         #full_log_path=os.path.join(cwd,name_config)
         full_log_path=cwd
@@ -309,7 +363,7 @@ def main(args):
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections
-        FI_setup.FI_framework.create_fault_injection_model(device,student_model,
+        FI_setup.FI_framework.create_fault_injection_model(torch.device("cpu"),student_model.cpu(),
                                             batch_size=1,
                                             input_shape=[3,224,224],
                                             layer_types=[torch.nn.Conv2d,torch.nn.Linear])
@@ -318,55 +372,103 @@ def main(args):
         logging.getLogger('pytorchfi').disabled = True
         FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
         FI_setup.load_check_point()
-
+        top_PID = os.getpid()
         #signal.signal(signal.SIGALRM, handler)      
-        
+        print(os.getpid(),os.getppid())
         # 5. Execute the fault injection campaign
-        mp.set_start_method('spawn',force=True)
         
+        gc.collect()
+        torch.cuda.empty_cache()
+        
+        mp.set_start_method('spawn',force=True)
+        #ctx = mp.get_context('spawn')
+        #q = ctx.Queue()
         with mp.Manager() as manager:
 
             for fault,k in FI_setup.iter_fault_list():
                 logger.info(f"index {k}: start")
+                #GPUResMemAlloc = cmdline("lsof /dev/nvidia0")
+                #GPUResMemAlloc = str(GPUResMemAlloc).replace('\\n', '\n')
+                #print(GPUResMemAlloc)
+                gc.collect()
+                with torch.no_grad():
+                    torch.cuda.empty_cache()
+
+                #print(torch.cuda.memory_summary())
                 # 5.1 inject the fault in the model
                 FI_setup.FI_report.shared_dict_pred=manager.dict()
                 FI_setup.FI_report.shared_dict_clas=manager.dict()
                 FI_setup.FI_report.shared_dict_target=manager.dict()
+                ############## input("XXXXXX")
                 FI_setup.FI_framework.bit_flip_weight_inj(fault)
                 FI_setup.open_faulty_results(f"F_{k}_results") 
+
                 #signal.alarm(30)  
                 # 5.2 run the inference with the faulty model          
-                Process = mp.Process(target=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
-                    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,))
+                Process = mpProcess(target=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
+                    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,))          
+                #Process = ctx.Process(target=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
+                #    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,))  
+                #Process = torch.multiprocessing.spawn(fn=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
+                #    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,),nprocs=)          
+                
+                
                 try:                       
                     Process.start()
-                    Process.join(60)
-                    #print(shared_dict_pred,shared_dict_clas,shared_dict_target)
-                    if Process.is_alive():                        
-                        Process.kill()
-                        Process.join()
-                        logger.info(f"Exception error: Timeout")   
-                        logger.info(f"index {k}: The DNN inference got stuck")                   
+                    Process.join(timeout=60)                    
+                    #print(shared_dict_pred,shared_dict_clas,shared_dict_target)                    
+                    if Process.is_alive():
+                        raise TimeoutError
+                    
+                    FI_setup.FI_report.merge_shared_report()
+                        #FI_setup.FI_framework.faulty_model.__del__()
                         #print(FI_setup.FI_report._shared_dict)
                     # evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                    #     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup) 
+                    #     log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)                     
+                    
+                except TimeoutError:
                     FI_setup.FI_report.merge_shared_report()
-                except Exception as Error:  
-                    if Process.is_alive():                        
-                        Process.kill()
-                        Process.join()
-                    FI_setup.FI_report.merge_shared_report()                  
-                    msg=f"Exception error: {Error}"
+                    logger.info(f"Exception error: Timeout")   
+                    logger.info(f"index {k}: The DNN inference got stuck")   
+                    #del FI_setup.FI_framework.pfi_model.corrupted_model
+                    while Process.is_alive():
+                        Process.terminate()                            
+                    Process.close()
+
+                    #FI_setup.FI_framework.faulty_model.__del__()
+                    
+                except Exception as gpuerr:
+                    msg=f"Exception error: {gpuerr}"
                     logger.info(msg)
-                    logger.info(f"index {k}: an unexpected error happened during inference")                            
-                # 5.3 Report the results of the fault injection campaign            
+                    logger.info(f"index {k}: an unexpected error happened during inference")  
+                    FI_setup.FI_report.merge_shared_report() 
+                    if Process.is_alive():                        
+                        while Process.is_alive():
+                            Process.terminate()
+                        Process.close()
+                        #Process.join()                      
+                # 5.3 Report the results of the fault injection campaign       
+                if Process.exception:
+                    error, traceback = Process.exception
+                    if "out of memory" in str(error) or "out of memory" in str(traceback):
+                        msg=f"Exception error: {error}"
+                        logger.info(msg)
+                        send_to_telegram(f"{myhost}: WeightsFSIM: {msg}") 
+                        sys.exit(0)
+
                 FI_setup.parse_results()
+                # p_children =[]
+                # for child in ProcessHier.children(recursive=True):
+                #     p_children.append((child.pid,child.name()))      
+                # 
+                # for (c_pid,c_name) in p_children:
+                #     print(c_pid,c_name)
             FI_setup.terminate_fsim()
             
         """
         for fault,k in FI_setup.iter_fault_list():
             logger.info(f"index {k}: start")
-            # 5.1 inject the fault in the model
+            # 5.1 inject the fault in the modelProcess.pid
             FI_setup.FI_framework.bit_flip_weight_inj(fault)
             logger.info(f"index {k}: fault injected succesfully")
             FI_setup.open_faulty_results(f"F_{k}_results") 

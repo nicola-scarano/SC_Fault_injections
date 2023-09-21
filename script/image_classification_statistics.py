@@ -384,7 +384,7 @@ def main(args):
         valid_layers=[torch.nn.Conv2d, torch.nn.Linear, torch.nn.BatchNorm2d, torch.nn.ReLU,compressai.layers.gdn.GDN1],
     )
     Embeddings.DNN_run_embeddings_model(test_data_loader, device=device, max_images=5000)
-    Embeddings.extract_embeddings_target_layer()
+    #Embeddings.extract_embeddings_target_layer()
     nvbitDNN.analize_numpy_embeddings()
 
     """

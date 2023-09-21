@@ -430,7 +430,7 @@ class extract_statistics_nvbit:
                 # statistics
                 running_corrects += torch.sum(preds.cpu() == labels.data)
                 eval_accuracy = running_corrects / (idx * len(labels) + len(labels))
-
+                self.extract_embeddings_target_layer()
                 if (max_images > 0) and ((idx * len(labels) + len(labels)) >= max_images):
                     print(f"{idx*len(labels)} images processed")
                     print(f"accuracy = {100*eval_accuracy}%")
@@ -474,7 +474,7 @@ class extract_statistics_nvbit:
             )
 
 
-            current_path = os.path.dirname(__file__)
+            current_path = os.path.expanduser(os.path.dirname(__file__))
             dir1 = os.path.join(current_path,"Embeddings_inputs")
             os.system(f"mkdir -p {dir1}")
 
@@ -484,8 +484,16 @@ class extract_statistics_nvbit:
             filename1 = os.path.join(dir1,f"{layer_id}.npy")
             filename2 = os.path.join(dir2,f"{layer_id}.npy")
 
-            np.save(filename1,embeddings_input)
-            np.save(filename2,embeddings_output)
+            if os.path.exists(filename1):
+                tmpIn1 = np.load(filename1)
+                tmpIn2 = np.concatenate([tmpIn1,embeddings_input])
+                np.save(filename1,tmpIn2)
+                tmpOut1 = np.load(filename1)
+                tmpOut2 = np.concatenate([tmpOut1,embeddings_input])
+                np.save(filename2,tmpOut2)
+            else:
+                np.save(filename1,embeddings_input)
+                np.save(filename2,embeddings_output)
 
             """
             ins = torch.from_numpy(embeddings_input)

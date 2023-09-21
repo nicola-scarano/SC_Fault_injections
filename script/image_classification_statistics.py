@@ -364,9 +364,9 @@ def main(args):
         distributed,
     )
 
-    test_batch_size=1#config['test']['test_data_loader']['batch_size']
+    test_batch_size=32#config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
-    test_num_workers=0#config['test']['test_data_loader']['num_workers']
+    test_num_workers=8#config['test']['test_data_loader']['num_workers']
     subsampler = DatasetSampling(test_data_loader.dataset,5)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)

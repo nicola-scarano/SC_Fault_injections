@@ -448,7 +448,7 @@ class extract_statistics_nvbit:
 
     def extract_embeddings_target_layer(self):
         for layer_id in self.layer_embedding_list_input:
-            print(layer_id)
+            #print(layer_id)
             if DEBUG:
                 print(len(self.layer_embedding_list_input[layer_id]))
             if DEBUG:
@@ -489,7 +489,7 @@ class extract_statistics_nvbit:
                 tmpIn2 = np.concatenate([tmpIn1,embeddings_input])
                 np.save(filename1,tmpIn2)
                 tmpOut1 = np.load(filename1)
-                tmpOut2 = np.concatenate([tmpOut1,embeddings_input])
+                tmpOut2 = np.concatenate([tmpOut1,embeddings_output])
                 np.save(filename2,tmpOut2)
             else:
                 np.save(filename1,embeddings_input)

@@ -15,13 +15,13 @@
 source ~/miniconda3/bin/activate
 conda deactivate
 
-cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
+# cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
 
 
-conda activate sc2-benchmark
+conda activate sc2-benchmark-fsim
 module load nvidia/cudasdk/11.6
 
-conda activate sc2-benchmark
+conda activate sc2-benchmark-fsim
 
 
 which python

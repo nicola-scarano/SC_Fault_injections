@@ -1,18 +1,9 @@
 #!/bin/bash
-#SBATCH --time=120:00:00
-#SBATCH --nodes=1
-#SBATCH --partition=cuda
-#SBATCH --ntasks-per-node=8
-#SBATCH --job-name=WeightsSplit
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=juan.guerrero@polito.it
-#SBATCH --output=merge_output_%A.log
-#SBATCH --error=merge_error_%A.log
 
 source ~/miniconda3/bin/activate
 conda deactivate
 
-cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark-fsim
+# cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark-fsim
 
 conda activate sc2-benchmark
 

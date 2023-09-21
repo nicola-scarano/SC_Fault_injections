@@ -5,7 +5,7 @@ conda deactivate
 
 cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark
 
-conda activate sc2-benchmark
+conda activate sc2-benchmark-fsim
 
 which pip
 which python

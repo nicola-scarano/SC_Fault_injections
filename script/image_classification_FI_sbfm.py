@@ -369,7 +369,10 @@ def main(args):
                                             layer_types=[torch.nn.Conv2d,torch.nn.Linear])
         
         # 4. generate the fault list
-        logging.getLogger('pytorchfi').disabled = True
+        logging.getLogger('pytorchfi.core').disabled = True
+        logging.getLogger('pytorchfi.FI_Weights').disabled = True
+        logging.getLogger('pytorchfi.neuron_error_models').disabled = True
+        
         FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
         FI_setup.load_check_point()
         top_PID = os.getpid()

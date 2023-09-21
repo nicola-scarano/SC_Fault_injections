@@ -1,7 +1,7 @@
 import argparse
 import datetime
 import json
-import os
+import os,sys
 import time
 
 import torch
@@ -28,6 +28,7 @@ import pytorchfi
 from pytorchfi import core
 from pytorchfi import neuron_error_models
 from pytorchfi import weight_error_models
+from pytorchfi import FI_Weights
 
 from pytorchfi.core import FaultInjection
 
@@ -37,10 +38,53 @@ from pytorchfi.FI_Weights import FI_manager
 from pytorchfi.FI_Weights import DatasetSampling 
 
 from torch.utils.data import DataLoader, Subset
+import multiprocessing as mp
+from multiprocessing import TimeoutError
+import traceback
+import gc
+import requests
+
+
 
 logger = def_logger.getChild(__name__)
 #torch.multiprocessing.set_sharing_strategy('file_system')
 import logging
+
+
+def send_to_telegram(message):
+
+    apiToken = '6152839244:AAGam9_rwCHyo5OyLswcMuKreUfERMDbyjU'
+    chatID = '665841436'
+    apiURL = f'https://api.telegram.org/bot{apiToken}/sendMessage'
+
+    try:
+        response = requests.post(apiURL, json={'chat_id': chatID, 'text': message})
+        print(response.text)
+    except Exception as e:
+        print(e)
+
+
+class mpProcess(mp.Process):
+    def __init__(self, *args, **kwargs):
+        mp.Process.__init__(self, *args, **kwargs)
+        self._pconn, self._cconn = mp.Pipe()
+        self._exception = None
+
+    def run(self):
+        try:
+            mp.Process.run(self)
+            self._cconn.send(None)
+        except Exception as e:
+            tb = traceback.format_exc()
+            self._cconn.send((e, tb))
+            # raise e  # You can still rise this exception if you need to
+
+    @property
+    def exception(self):
+        if self._pconn.poll():
+            self._exception = self._pconn.recv()
+        return self._exception
+
 
 def get_argparser():
     parser = argparse.ArgumentParser(description='Supervised compression for image classification tasks')
@@ -104,8 +148,9 @@ def train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch,
 
 
 @torch.inference_mode()
-def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_eval=False,
-             log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup:FI_manager = None):
+def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, 
+            no_dp_eval, log_freq, title, header, fsim_enabled, Fsim_setup:FI_manager):
+            #no_dp_eval=False, log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup = None):
     model = model_wo_ddp.to(device)
     if distributed and not no_dp_eval:
         model = DistributedDataParallel(model_wo_ddp, device_ids=device_ids)
@@ -122,16 +167,21 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
     analyzable = check_if_analyzable(model_wo_ddp)
     metric_logger = MetricLogger(delimiter='  ')
     im=0
+
     for image, target in metric_logger.log_every(data_loader, log_freq, header):
         if isinstance(image, torch.Tensor):
             image = image.to(device, non_blocking=True)
+            #image = image.to(device)
 
         if isinstance(target, torch.Tensor):
             target = target.to(device, non_blocking=True)
+            #target = target.to(device)
 
         if fsim_enabled==True:
             output = model(image)
-            Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
+
+            #Fsim_setup.FI_report.update_report(im,output,target,topk=(1,5))
+            Fsim_setup.FI_report.update_report_shared_dict(im,output,target,topk=(1,5))
         else:
             output = model(image)
 
@@ -255,10 +305,10 @@ def main(args):
         student_model.activate_analysis()
         
 
-    test_batch_size=config['test']['test_data_loader']['batch_size']
+    test_batch_size=32#config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
-    test_num_workers=config['test']['test_data_loader']['num_workers']
-    subsampler = DatasetSampling(test_data_loader.dataset,5)
+    test_num_workers=8#config['test']['test_data_loader']['num_workers']
+    subsampler = DatasetSampling(test_data_loader.dataset,1)
     index_dataset=subsampler.listindex()
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
@@ -266,11 +316,16 @@ def main(args):
     # name_config=((args.config.split('/'))[-1]).replace(".yaml","")
     # conf_fault_dict=config['fault_info']['neurons']
     # name_config=f"FSIM_logs/{name_config}_neurons_{conf_fault_dict['layers'][0]}"
-
+    
     if args.fsim_config:
+
+        print(logging.root.manager.loggerDict)
+        myhost = os.uname()[1]
         fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
         conf_fault_dict=fsim_config_descriptor['fault_info']['neurons']
         cwd=os.getcwd() 
+        send_to_telegram(f"{myhost}: NeuronsFSIM: layer: {conf_fault_dict['layers'][0]} Simulation_started!..")
+
         student_model.eval() 
         # student_model.deactivate_analysis()
         #full_log_path=os.path.join(cwd,name_config)
@@ -282,16 +337,21 @@ def main(args):
         FI_setup.open_golden_results("Golden_results")
         evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
                 log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        FI_setup.FI_report.merge_shared_report() 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections
-        FI_setup.FI_framework.create_fault_injection_model(device,student_model,
+        FI_setup.FI_framework.create_fault_injection_model(torch.device("cpu"),student_model.cpu(),
                                             batch_size=test_batch_size,
                                             input_shape=[3,224,224],
                                             layer_types=[torch.nn.Conv2d,torch.nn.Linear],Neurons=True)
         
         # 4. generate the fault list
-        logging.getLogger('pytorchfi').disabled = True
+        
+        logging.getLogger('pytorchfi.core').disabled = True
+        logging.getLogger('pytorchfi.FI_Weights').disabled = True
+        logging.getLogger('pytorchfi.neuron_error_models').disabled = True
+        
         #logging.getLogger('pytorchfi.neuron_error_models').disabled = True
         FI_setup.generate_fault_list(flist_mode='neurons',
                                     f_list_file='fault_list.csv',
@@ -305,32 +365,100 @@ def main(args):
                                     neuron_fault_rate_steps=conf_fault_dict['neuron_fault_rate_steps'])     
         
         FI_setup.load_check_point()
-
-
-        ber=5
         # 5. Execute the fault injection campaign
-        for fault,k in FI_setup.iter_fault_list():
-            # 5.1 inject the fault in the model
-            #FI_setup.FI_framework.bit_flip_weight_inj([fault[0]],[fault[1]],[fault[2]],[fault[3]],[fault[4]],[fault[5]])
-            FI_setup.FI_framework.bit_flip_err_neuron(fault)
-            FI_setup.open_faulty_results(f"F_{k}_results")
-
-            try:   
-                # 5.2 run the inference with the faulty model 
-                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                    log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+        mp.set_start_method('spawn',force=True)
+        
+    
+        with mp.Manager() as manager:
             
-            except OSError as Oserr:
-                msg=f"Oserror: {Oserr}"
-                logger.info(msg)
+            for fault,k in FI_setup.iter_fault_list():
+                logger.info(f"index {k}: start")
+                # 5.1 inject the fault in the model
+                #FI_setup.FI_framework.bit_flip_weight_inj([fault[0]],[fault[1]],[fault[2]],[fault[3]],[fault[4]],[fault[5]])
 
-            except Exception as Error:
-                msg=f"Exception error: {Error}"
-                logger.info(msg)            
-            # 5.3 Report the results of the fault injection campaign
-            FI_setup.parse_results()
-            #break
-        FI_setup.terminate_fsim()
+                gc.collect()
+                with torch.no_grad():
+                    torch.cuda.empty_cache()
+
+                FI_setup.FI_report.shared_dict_pred=manager.dict()
+                FI_setup.FI_report.shared_dict_clas=manager.dict()
+                FI_setup.FI_report.shared_dict_target=manager.dict()
+                FI_setup.FI_framework.bit_flip_err_neuron(fault)
+                FI_setup.open_faulty_results(f"F_{k}_results")
+
+                Process = mpProcess(target=evaluate, args=(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval,
+                    log_freq, '[Student: {}]'.format(student_model_config['name']), 'FSIM', True,FI_setup,))
+
+
+                try:   
+                    # 5.2 run the inference with the faulty model 
+                    Process.start()
+                    Process.join(timeout=90)
+                    if Process.is_alive():
+                        raise TimeoutError
+                    
+                    FI_setup.FI_report.merge_shared_report()
+
+
+                except TimeoutError:
+                    FI_setup.FI_report.merge_shared_report()
+                    print(Process.name)
+                    logger.info(f"Exception error: Timeout")   
+                    logger.info(f"index {k}: The DNN inference got stuck")   
+                    #del FI_setup.FI_framework.pfi_model.corrupted_model
+                    while Process.is_alive():
+                        Process.terminate()                            
+                    Process.close()
+
+                except Exception as gpuerr:
+                    msg=f"Exception error: {gpuerr}"
+                    logger.info(msg)
+                    logger.info(f"index {k}: an unexpected error happened during inference")   
+                    FI_setup.FI_report.merge_shared_report()
+                    if Process.is_alive():                        
+                        while Process.is_alive():
+                            Process.terminate()
+                        Process.close()
+                    
+                        #Process.join()   
+
+                """
+                except OSError as Oserr:
+                    msg=f"Oserror: {Oserr}"
+                    logger.info(msg)    
+                    if Process.is_alive():                        
+                        while Process.is_alive():
+                            Process.terminate()
+                        Process.close()
+                        #Process.join()   
+                    FI_setup.FI_report.merge_shared_report()
+                    gc.collect()
+                    torch.cuda.empty_cache()  
+                                    
+                except Exception as Error:
+                    msg=f"Exception error: {Error}"
+                    logger.info(msg)
+                    logger.info(f"index {k}: an unexpected error happened during inference")   
+                    if Process.is_alive():                        
+                        while Process.is_alive():
+                            Process.terminate()
+                        Process.close()
+                        #Process.join()   
+                    FI_setup.FI_report.merge_shared_report()
+                    gc.collect()
+                    torch.cuda.empty_cache()  
+                """
+                if Process.exception:
+                    error, traceback = Process.exception
+                    if "out of memory" in str(error) or "out of memory" in str(traceback):
+                        msg=f"Exception error: {str(error)}"
+                        logger.info(msg)
+                        send_to_telegram(f"{myhost}: NeuronsFSIM: {msg}") 
+                        sys.exit(0)
+  
+                # 5.3 Report the results of the fault injection campaign
+                FI_setup.parse_results()
+            FI_setup.terminate_fsim()
 
 
 

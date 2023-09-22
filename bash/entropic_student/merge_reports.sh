@@ -5,7 +5,7 @@ conda deactivate
 
 # cd  /home/jguerrero/Workspace/GitHub/sc2-benchmark-fsim
 
-conda activate sc2-benchmark
+conda activate sc2-benchmark-fsim
 
 which pip
 which python
@@ -21,6 +21,6 @@ echo $folder
 echo $workers
 echo ${Global_path}/${folder}
 
-python ${Global_path}/SC_Fault_injections/SLURM_scripts/crbq/merge_reports.py --path ${Global_path}/${folder} --workers ${workers}
+python ${Global_path}/SC_Fault_injections/bash/entropic_student/merge_reports.py --path ${Global_path}/${folder} --workers ${workers}
 
 echo "merge finishied"

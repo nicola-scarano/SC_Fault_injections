@@ -3,6 +3,15 @@
 This is a Fault/error injection framework for reliability evaluation of split computing DNN architectures. 
 The framework is compatible with [sc2-benchmark](https://github.com/yoshitomo-matsubara/sc2-benchmark) and can be extended to other scenarios as well
 
+```bibtex
+@article{guerreroVTS2024,
+  title={Evaluating the Reliability of Supervised Compression for Split Computing},
+  author={Guerrero-Balaguera, Juan-David and Rodriguez Condia, Josie E. and Levorato, Marco and Sonza Reorda, Matteo },
+  journal={VTS2024 Proceedings},
+  year={2024}
+}
+```
+
 # prerequisites
 Install miniconda environmet if you already have it ignore this step
 ```bash

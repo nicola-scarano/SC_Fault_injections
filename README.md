@@ -24,6 +24,7 @@ bash Miniconda3-py38_23.1.0-1-Linux-x86_64.sh -b
 # sc2-benchmark
 git clone https://github.com/yoshitomo-matsubara/sc2-benchmark
 cd sc2-benchmark
+# Download and decompress the pre-trained split DNN models
 
 # SC_Fult_injections: 
 git clone https://github.com/divadnauj-GB/SC_Fault_injections

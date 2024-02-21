@@ -9,7 +9,7 @@ from torch import distributed as dist
 from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
-from torchmetrics.classification import MulticlassF1Score
+from torchmetrics.classification import MulticlassF1Score, MulticlassRecall, MulticlassPrecision
 from torchdistill.common import file_util, yaml_util, module_util
 from torchdistill.common.constant import def_logger
 from torchdistill.common.main_util import is_main_process, init_distributed_mode, load_ckpt, save_ckpt, set_seed
@@ -107,7 +107,7 @@ def train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch,
 
 @torch.inference_mode()
 def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_eval=False,
-             log_freq=1000, title=None, header='Test:', fsim_enabled=False, Fsim_setup:FI_manager = None):
+             log_freq=100, title=None, header='Test:', fsim_enabled=False, Fsim_setup:FI_manager = None):
     model = model_wo_ddp.to(device)
     if distributed and not no_dp_eval:
         model = DistributedDataParallel(model_wo_ddp, device_ids=device_ids)
@@ -157,20 +157,28 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
         metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
         im+=1
 
-    if fsim_enabled:
+    if fsim_enabled==True:
         val_targ = val_targ.type(torch.int64)
-        f1_1 = MulticlassF1Score(task='multiclass', num_classes=1000, average='macro')
+        f1_1 = MulticlassF1Score(task='multiclass', num_classes=10, average='macro')
+        rec_1 = MulticlassRecall(average='macro', num_classes=10)
+        prec_1 = MulticlassPrecision(average='macro', num_classes=10)
 
         best_f1 = f1_1(val_distr, val_targ)
+        best_rec = rec_1(val_distr, val_targ)
+        best_prec = prec_1(val_distr, val_targ)
 
-        f1_k = MulticlassF1Score(task='multiclass', num_classes=1000, average='macro', top_k=5)
+        f1_k = MulticlassF1Score(task='multiclass', num_classes=10, average='macro', top_k=5)
+        rec_k = MulticlassRecall(num_classes=10, average='macro', top_k=5)
+        prec_k = MulticlassPrecision(num_classes=10, average='macro', top_k=5)
         # logger.info(f'val_distr: {val_distr}')
         # logger.info(f'val_targ: {val_targ}')
         # logger.info(f'val_distr.shape: {val_distr.shape}')
         # logger.info(f'val_targ.shape: {val_targ.shape}')
         k_f1 = f1_k(val_distr, val_targ)
+        k_rec = rec_k(val_distr, val_targ)
+        k_prec = prec_k(val_distr, val_targ)
 
-        Fsim_setup.FI_report.set_f1_values(best_f1=best_f1, k_f1=k_f1, header=header)
+        Fsim_setup.FI_report.set_f1_values(best_f1=best_f1, k_f1=k_f1, header=header, best_prec= best_prec, best_rec = best_rec, k_prec= k_prec, k_rec = k_rec)
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     top1_accuracy = metric_logger.acc1.global_avg
@@ -260,7 +268,11 @@ def main(args):
     student_model_config =\
         models_config['student_model'] if 'student_model' in models_config else models_config['model']
     ckpt_file_path = student_model_config.get('ckpt', None)
+    # logger.info("============================")
+    # logger.info(ckpt_file_path)
+    # logger.info("============================")
     student_model = load_model(student_model_config, device, distributed)
+    logger.info(student_model)
     if args.log_config:
         logger.info(config)
 
@@ -274,7 +286,7 @@ def main(args):
     test_data_loader_config = test_config['test_data_loader']
     test_data_loader = util.build_data_loader(dataset_dict[test_data_loader_config['dataset_id']],
                                               test_data_loader_config, distributed)
-    log_freq = test_config.get('log_freq', 1000)
+    log_freq = test_config.get('log_freq', 100)
     no_dp_eval = args.no_dp_eval
     if not args.student_only and teacher_model is not None:
         evaluate(teacher_model, test_data_loader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
@@ -314,8 +326,8 @@ def main(args):
 
         # 2. Run a fault free scenario to generate the golden model
         FI_setup.open_golden_results("Golden_results")
-        # evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-        #         log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+        evaluate(student_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                log_freq=log_freq, title='[Student: {}]'.format(student_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections

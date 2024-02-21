@@ -1,0 +1,283 @@
+datasets:
+  ilsvrc2012:
+    name: &dataset_name 'cifar100'
+    type: 'CIFAR100'
+    root: &root_dir !join ['~/dataset/', *dataset_name]
+    splits:
+      train:
+        dataset_id: &cifar_train !join [*dataset_name, '/train']
+        params:
+          train: True
+          root: *root_dir
+          transform_params:
+            - type: 'RandomResizedCrop'
+              params:
+                size: &input_size [32, 32]
+            - type: 'RandomHorizontalFlip'
+              params:
+                p: 0.5
+            - &totensor
+              type: 'ToTensor'
+              params:
+            - &normalize
+              type: 'Normalize'
+              params:
+                mean: [0.5071, 0.4867, 0.4408]
+                std: [0.2675, 0.2565, 0.2761]
+      val:
+        dataset_id: &cifar_val !join [*dataset_name, '/val']
+        params:
+          root: *root_dir
+          transform_params:
+            - *totensor
+            - *normalize
+
+models:
+  teacher_model:
+    name: 'MobileNetV3Classifier'
+    classification_model:
+      name: &teacher_model_name 'mobilenet_v3_small'
+      params:
+        num_classes: 100
+        pretrained: False
+      experiment: &teacher_experiment !join [*dataset_name, '-', *teacher_model_name]
+      ckpt: !join ['./resource/ckpt/cifar100/teacher/', *teacher_experiment, '.pth']
+    params:
+      num_classes: 100
+  student_model:
+    name: 'splittable_MobileNet_v3_small'
+    params:
+      num_classes: 100
+      org_model_ckpt_file_path_or_url: !join ['./resource/ckpt/cifar100/teacher/', *teacher_experiment, '.pth']
+      bottleneck_config:
+        name: 'mobilenet_v3_small_compression_cov2_custom_relu'
+        start_coverage: 1
+        end_coverage: 3
+        params:
+          bottleneck_channel: &bch 6
+          bottleneck_idx: 6 #########
+          output_channel: 24
+          compressor_transform_params:
+            - type: 'SimpleQuantizer'
+              params:
+                num_bits: 8
+          decompressor_transform_params:
+            - type: 'SimpleDequantizer'
+              params:
+                num_bits: 8
+      mobilenet_name: 'mobilenet_v3_small'
+      pre_transform_params:
+      skips_avgpool: False
+      skips_fc: False
+      analysis_config:
+        analyzes_after_compress: True
+        analyzer_configs:
+          - type: 'FileSizeAnalyzer'
+            params:
+              unit: 'KB'
+    experiment: &experiment !join [*dataset_name, '-mobilenet_v3_small-bq', *bch, 'ch_from_', *teacher_model_name, 'custom_relu']
+    ckpt: !join ['/home/jd.guerrero/Documents/g.esposito/AlternativeModels-SC2/resource/ckpt/cifar100/supervised_compression/ghnd-bq/', *experiment, '.pt']
+
+train:
+  log_freq: 1000
+  epoch_to_update: &epoch_to_update 20
+  num_epochs: *epoch_to_update
+  train_data_loader:
+    dataset_id: *cifar_train
+    random_sample: True
+    batch_size: 64
+    num_workers: 16
+    cache_output:
+  val_data_loader:
+    dataset_id: *cifar_val
+    random_sample: False
+    batch_size: 32
+    num_workers: 16
+  teacher:
+    sequential: ['classification_model.features.layer0', 'classification_model.features.layer1', 'classification_model.features.layer2', 'classification_model.features.layer3', 'classification_model.features.layer4', 'classification_model.features.layer5', 'classification_model.features.layer6', 'classification_model.features.layer7', 'classification_model.features.layer8', 'classification_model.features.layer9', 'classification_model.features.layer10', 'classification_model.features.layer11', 'classification_model.features.layer12'] #, 'classification_model.avgpool', 'classification_model.classifier']
+    frozen_modules: []
+    forward_hook:
+      input: []
+      output: ['classification_model.features.layer0', 'classification_model.features.layer1', 'classification_model.features.layer2', 'classification_model.features.layer3', 'classification_model.features.layer4', 'classification_model.features.layer5', 'classification_model.features.layer6', 'classification_model.features.layer7', 'classification_model.features.layer8', 'classification_model.features.layer9', 'classification_model.features.layer10', 'classification_model.features.layer11', 'classification_model.features.layer12']
+    wrapper: 'DistributedDataParallel'
+    requires_grad: False
+  student:
+    frozen_modules: ['features.layer0', 'features.layer4','features.layer5','features.layer6', 'features.layer7', 'features.layer8','features.layer9', 'features.layer10', 'features.layer11', 'features.layer12']
+    forward_hook:
+      input: []
+      output: ['features.layer0', 'features.bottleneck_layer','features.layer4','features.layer5', 'features.layer6', 'features.layer7', 'features.layer8','features.layer9', 'features.layer10', 'features.layer11', 'features.layer12']
+    wrapper: 'DistributedDataParallel'
+    requires_grad: True
+  optimizer:
+    type: 'Adam'
+    params:
+      lr: 0.01
+  scheduler:
+    type: 'MultiStepLR'
+    params:
+      milestones: [5, 10, 15]
+      gamma: 0.1
+  criterion:
+    type: 'GeneralizedCustomLoss'
+    org_term:
+      factor: 0.0
+    sub_terms:
+      layer1:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.bottleneck_layer'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer3'
+            io: 'output'
+        factor: 1.0
+      layer2:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer4'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer4'
+            io: 'output'
+        factor: 1.0
+      layer3:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer5'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer5'
+            io: 'output'
+        factor: 1.0
+      layer4:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer6'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer6'
+            io: 'output'
+        factor: 1.0
+      layer5:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer7'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer7'
+            io: 'output'
+        factor: 1.0
+      layer6:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer8'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer8'
+            io: 'output'
+        factor: 1.0
+
+      layer7:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer9'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer9'
+            io: 'output'
+        factor: 1.0
+
+      layer8:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer10'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer10'
+            io: 'output'
+        factor: 1.0
+      layer9:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer11'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer11'
+            io: 'output'
+        factor: 1.0
+      layer9:
+        criterion:
+          type: 'MSELoss'
+          params:
+            reduction: 'sum'
+        params:
+          input:
+            is_from_teacher: False
+            module_path: 'features.layer12'
+            io: 'output'
+          target:
+            is_from_teacher: True
+            module_path: 'classification_model.features.layer12'
+            io: 'output'
+        factor: 1.0
+
+test:
+  test_data_loader:
+    dataset_id: *cifar_val
+    random_sample: False
+    batch_size: 1
+    num_workers: 16

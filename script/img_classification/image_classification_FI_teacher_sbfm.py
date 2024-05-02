@@ -71,38 +71,6 @@ def load_model(model_config, device, distributed):
     return get_wrapped_classification_model(model_config, device, distributed)
 
 
-def train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch, log_freq):
-    metric_logger = MetricLogger(delimiter='  ')
-    metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value}'))
-    metric_logger.add_meter('img/s', SmoothedValue(window_size=10, fmt='{value}'))
-    uses_aux_loss = aux_module is not None and not bottleneck_updated
-    header = 'Epoch: [{}]'.format(epoch)
-    for sample_batch, targets, supp_dict in \
-            metric_logger.log_every(training_box.train_data_loader, log_freq, header):
-        if isinstance(sample_batch, torch.Tensor):
-            sample_batch = sample_batch.to(device)
-
-        if isinstance(targets, torch.Tensor):
-            targets = targets.to(device)
-
-        start_time = time.time()
-        loss = training_box(sample_batch, targets, supp_dict)
-        aux_loss = None
-        if uses_aux_loss:
-            aux_loss = aux_module.aux_loss()
-            aux_loss.backward()
-
-        training_box.update_params(loss)
-        batch_size = len(sample_batch)
-        if uses_aux_loss:
-            metric_logger.update(loss=loss.item(), aux_loss=aux_loss.item(),
-                                 lr=training_box.optimizer.param_groups[0]['lr'])
-        else:
-            metric_logger.update(loss=loss.item(), lr=training_box.optimizer.param_groups[0]['lr'])
-        metric_logger.meters['img/s'].update(batch_size / (time.time() - start_time))
-        if (torch.isnan(loss) or torch.isinf(loss)) and is_main_process():
-            raise ValueError('The training loop was broken due to loss = {}'.format(loss))
-
 
 @torch.inference_mode()
 def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_eval=False,
@@ -153,51 +121,6 @@ def evaluate(model_wo_ddp, data_loader, device, device_ids, distributed, no_dp_e
     return metric_logger.acc1.global_avg
 
 
-def train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, device_ids, distributed, config, args):
-    logger.info('Start training')
-    train_config = config['train']
-    lr_factor = args.world_size if distributed and args.adjust_lr else 1
-    training_box = get_training_box(student_model, dataset_dict, train_config,
-                                    device, device_ids, distributed, lr_factor) if teacher_model is None \
-        else get_distillation_box(teacher_model, student_model, dataset_dict, train_config,
-                                  device, device_ids, distributed, lr_factor)
-    best_val_top1_accuracy = 0.0
-    optimizer, lr_scheduler = training_box.optimizer, training_box.lr_scheduler
-    if file_util.check_if_exists(ckpt_file_path):
-        best_val_top1_accuracy, _, _ = load_ckpt(ckpt_file_path, optimizer=optimizer, lr_scheduler=lr_scheduler)
-
-    log_freq = train_config['log_freq']
-    student_model_without_ddp = student_model.module if module_util.check_if_wrapped(student_model) else student_model
-    aux_module = student_model_without_ddp.get_aux_module() if check_if_updatable(student_model_without_ddp) else None
-    epoch_to_update = train_config.get('epoch_to_update', None)
-    bottleneck_updated = False
-    no_dp_eval = args.no_dp_eval
-    start_time = time.time()
-    for epoch in range(args.start_epoch, training_box.num_epochs):
-        training_box.pre_process(epoch=epoch)
-        if epoch_to_update is not None and epoch_to_update <= epoch and not bottleneck_updated:
-            logger.info('Updating entropy bottleneck')
-            student_model_without_ddp.update()
-            bottleneck_updated = True
-
-        train_one_epoch(training_box, aux_module, bottleneck_updated, device, epoch, log_freq)
-        val_top1_accuracy = evaluate(student_model, training_box.val_data_loader, device, device_ids, distributed,
-                                     no_dp_eval=no_dp_eval, log_freq=log_freq, header='Validation:')
-        if val_top1_accuracy > best_val_top1_accuracy and is_main_process():
-            logger.info('Best top-1 accuracy: {:.4f} -> {:.4f}'.format(best_val_top1_accuracy, val_top1_accuracy))
-            logger.info('Updating ckpt at {}'.format(ckpt_file_path))
-            best_val_top1_accuracy = val_top1_accuracy
-            save_ckpt(student_model_without_ddp, optimizer, lr_scheduler,
-                      best_val_top1_accuracy, config, args, ckpt_file_path)
-        training_box.post_process()
-
-    if distributed:
-        dist.barrier()
-
-    total_time = time.time() - start_time
-    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    logger.info('Training time {}'.format(total_time_str))
-    training_box.clean_modules()
 
 
 def main(args):
@@ -229,18 +152,10 @@ def main(args):
     teacher_model_config = models_config.get('teacher_model', None)
     teacher_model =\
         load_model(teacher_model_config, device, distributed) if teacher_model_config is not None else None
-    student_model_config =\
-        models_config['student_model'] if 'student_model' in models_config else models_config['model']
-    ckpt_file_path = student_model_config.get('ckpt', None)
-    student_model = load_model(student_model_config, device, distributed)
+
     if args.log_config:
         logger.info(config)
 
-    if not args.test_only:
-        train(teacher_model, student_model, dataset_dict, ckpt_file_path, device, device_ids, distributed, config, args)
-        student_model_without_ddp =\
-            student_model.module if module_util.check_if_wrapped(student_model) else student_model
-        load_ckpt(student_model_config['ckpt'], model=student_model_without_ddp, strict=True)
 
     test_config = config['test']
     test_data_loader_config = test_config['test_data_loader']
@@ -248,18 +163,6 @@ def main(args):
                                               test_data_loader_config, distributed)
     log_freq = test_config.get('log_freq', 1000)
     no_dp_eval = args.no_dp_eval
-    if not args.student_only and teacher_model is not None:
-        evaluate(teacher_model, test_data_loader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                 log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']))
-
-    
-
-    if check_if_updatable(student_model):
-        student_model.update()
-        
-
-    if check_if_analyzable(student_model):
-        student_model.activate_analysis()
         
 
     test_batch_size=config['test']['test_data_loader']['batch_size']
@@ -270,9 +173,6 @@ def main(args):
     data_subset=Subset(test_data_loader.dataset, index_dataset)
     dataloader = DataLoader(data_subset,batch_size=test_batch_size, shuffle=test_shuffle,pin_memory=True,num_workers=test_num_workers)
 
-    # name_config=((args.config.split('/'))[-1]).replace(".yaml","")
-    # conf_fault_dict=config['fault_info']['weights']
-    # name_config=f"FSIM_logs/{name_config}_weights_{conf_fault_dict['layer'][0]}"
 
     if args.fsim_config:
         fsim_config_descriptor = yaml_util.load_yaml_file(os.path.expanduser(args.fsim_config))
@@ -288,7 +188,7 @@ def main(args):
         # 2. Run a fault free scenario to generate the golden model
         FI_setup.open_golden_results("Golden_results")
         evaluate(teacher_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
+                log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
 
         # 3. Prepare the Model for fault injections
@@ -310,7 +210,7 @@ def main(args):
             try:   
                 # 5.2 run the inference with the faulty model 
                 evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                    log_freq=log_freq, title='[Student: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+                    log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
             except Exception as Error:
                 msg=f"Exception error: {Error}"
                 logger.info(msg)

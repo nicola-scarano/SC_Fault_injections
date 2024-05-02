@@ -1,0 +1,61 @@
+datasets:
+  ilsvrc2012:
+    name: &dataset_name 'cifar10'
+    type: 'CIFAR10'
+    root: &root_dir !join ['~/dataset/', *dataset_name]
+    splits:
+      train:
+        dataset_id: &cifar_train !join [*dataset_name, '/train']
+        params:
+          train: True
+          download: True
+          root: *root_dir
+          transform_params:
+            - &resize
+              type: 'Resize'
+              params:
+                size: &input_size [70 , 70]
+            - &randomCrop
+              type: 'RandomCrop'
+              params:
+                size: [64 , 64]
+            - &totensor
+              type: 'ToTensor'
+              params:
+            - &normalize
+              type: 'Normalize'
+              params: 
+                mean: [0.5, 0.5, 0.5]
+                std: [0.5, 0.5, 0.5]
+            
+      val:
+        dataset_id: &cifar_val !join [*dataset_name, '/val']
+        params:
+          download: True
+          train: False
+          root: *root_dir
+          transform_params:
+            - *resize
+            - *randomCrop
+            - *totensor
+            - *normalize
+
+models:
+  teacher_model:
+    name: 'mnasnet0_5'
+    classification_model:
+      name: &teacher_model_name 'mnasnet0_5'
+      params:
+        num_classes: 10
+        pretrained: False
+      experiment: &teacher_experiment !join [*dataset_name, '-', *teacher_model_name]
+      ckpt: !join ['./resource/ckpt/cifar10/teacher/', *teacher_experiment, '.pth']
+    params:
+      num_classes: 10
+  
+test:
+  test_data_loader:
+    dataset_id: *cifar_val
+    random_sample: False
+    batch_size: 1
+    num_workers: 16

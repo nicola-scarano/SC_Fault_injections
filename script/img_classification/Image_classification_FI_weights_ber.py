@@ -195,29 +195,30 @@ def main(args):
         FI_setup.FI_framework.create_fault_injection_model(device,teacher_model,
                                             batch_size=1,
                                             input_shape=[3,224,224],
-                                            layer_types=[torch.nn.Conv2d,torch.nn.Linear])
+                                            layer_types=[torch.nn.Conv2d,torch.nn.Linear], 
+                                            BER=True)
         # input("wait for a second...")
         # 4. generate the fault list
         logging.getLogger('pytorchfi').disabled = True
-        FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
+        FI_setup.generate_fault_list(flist_mode='static_ber',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])    
         FI_setup.load_check_point()
-
-        # 5. Execute the fault injection campaign
-        for fault,k in FI_setup.iter_fault_list():
-            # 5.1 inject the fault in the model
-            FI_setup.FI_framework.bit_flip_weight_inj(fault)
-            FI_setup.open_faulty_results(f"F_{k}_results")
-            try:   
-                # 5.2 run the inference with the faulty model 
-                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                    log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
-            except Exception as Error:
-                msg=f"Exception error: {Error}"
-                logger.info(msg)
-            # 5.3 Report the results of the fault injection campaign            
-            FI_setup.parse_results()
-            # break
-        FI_setup.terminate_fsim()
+        
+        # # 5. Execute the fault injection campaign
+        # for fault,k in FI_setup.iter_fault_list():
+        #     # 5.1 inject the fault in the model
+        #     FI_setup.FI_framework.bit_flip_weight_inj(fault)
+        #     FI_setup.open_faulty_results(f"F_{k}_results")
+        #     try:   
+        #         # 5.2 run the inference with the faulty model 
+        #         evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+        #             log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+        #     except Exception as Error:
+        #         msg=f"Exception error: {Error}"
+        #         logger.info(msg)
+        #     # 5.3 Report the results of the fault injection campaign            
+        #     FI_setup.parse_results()
+        #     # break
+        # FI_setup.terminate_fsim()
 
 
 if __name__ == '__main__':

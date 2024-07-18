@@ -65,9 +65,6 @@ def get_argparser():
     parser.add_argument('-adjust_lr', action='store_true',
                         help='multiply learning rate by number of distributed processes (world_size)')
     parser.add_argument('--fsim_config', help='Yaml file path fsim config')
-    parser.add_argument('--ber', help='Error Rate')
-    parser.add_argument('--bitloc', help='Bit location')
-    parser.add_argument('--layr_idx', help='Bit location')
     return parser
 
 
@@ -243,7 +240,7 @@ def main(args):
 
     device = torch.device(args.device)
 
-    teacher_model = LeNet5(num_classes=10)
+    # teacher_model = LeNet5(num_classes=10)
     if args.log_config:
         logger.info(config)
     
@@ -251,19 +248,13 @@ def main(args):
     
     teacher_model_config = models_config.get('teacher_model', None)
 
-    # teacher_model = torch.load(
-    #         os.path.join(teacher_model_config['ckpt']), map_location=torch.device("cpu")
-    #     )
-    # teacher_model = LeNet5(num_classes=10)
+
     teacher_model = torch.load(teacher_model_config['ckpt'])
-    
+
     teacher_model.layer1[2]= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(6.4008), decimals=3), inplace=True)
     teacher_model.layer2[2]= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(8.2039), decimals=3), inplace=True)
     teacher_model.relu= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(27.2505), decimals=3), inplace=True)
     teacher_model.relu1= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(45.0015), decimals=3), inplace=True)
-    # teacher_model = rec_dnn_exploration(teacher_model)
-
-    # teacher_model.load_state_dict(torch.load(teacher_model_config['ckpt'])['state_dict'])
 
 
     logger.info(teacher_model)
@@ -318,47 +309,41 @@ def main(args):
         evaluate(teacher_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
                 log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='Golden', fsim_enabled=True, Fsim_setup=FI_setup) 
         FI_setup.close_golden_results()
-        trials = 50
+
         # 3. Prepare the Model for fault injections
-        FI_setup.FI_framework.create_fault_injection_model(device,teacher_model,
-                                            batch_size=1,
-                                            input_shape=[1,32,32],
-                                            layer_types=[torch.nn.Conv2d,torch.nn.Linear] )
-        # input("wait for a second...")
+        FI_setup.FI_framework.create_fault_injection_model(device,
+                                                           teacher_model,
+                                                            batch_size=1,
+                                                            input_shape=[1,32,32],
+                                                            layer_types=[torch.nn.Conv2d,torch.nn.Linear])
         # 4. generate the fault list
-        ber_list = list(conf_fault_dict['ber_list'])
         logging.getLogger('pytorchfi').disabled = True
         start = time.time()
-        FI_setup.generate_fault_list(flist_mode='static_ber_fixed_layr',
-                                     f_list_file='fault_list.csv',
-                                     ber_list= ber_list,
-                                     layr=int(args.layr_idx),
-                                     trials = trials)
+
+        FI_setup.generate_fault_list(flist_mode='sbfm',f_list_file='fault_list.csv',layer=conf_fault_dict['layer'][0])
+        
+        FI_setup.load_check_point()
+
         end = time.time()
         logger.info(start-end)
-        # FI_setup.load_check_point()
         
-        # # 5. Execute the fault injection campaign
-        counter = 0
-        # logger.info(ber_list)
-        for ber in ber_list:
-            for trial in range(trials):
-                fault_description =  FI_setup.get_trial_list(ber, trial)
-                # 5.1 inject the fault in the model
-                FI_setup.FI_framework.ber_var_bit_flip_weight_inj(fault_description, ber, trial)
-                FI_setup.open_faulty_results(f"F_{ber}_{trial}_results")
-                try:
-                    # 5.2 run the inference with the faulty model 
-                    evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
-                        log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
-                except Exception as Error:
-                    msg=f"Exception error: {Error}"
-                    logger.info(msg)
-                # 5.3 Report the results of the fault injection campaign            
-                FI_setup.parse_results()
-                counter += 1
-        #     # break
+        # 5. Execute the fault injection campaign
+        for fault,k in FI_setup.iter_fault_list():
+            # 5.1 inject the fault in the model
+            FI_setup.FI_framework.bit_flip_weight_inj(fault)
+            FI_setup.open_faulty_results(f"F_{k}_results")
+            try:   
+                # 5.2 run the inference with the faulty model 
+                evaluate(FI_setup.FI_framework.faulty_model, dataloader, device, device_ids, distributed, no_dp_eval=no_dp_eval,
+                    log_freq=log_freq, title='[Teacher: {}]'.format(teacher_model_config['name']), header='FSIM', fsim_enabled=True,Fsim_setup=FI_setup)        
+            except Exception as Error:
+                msg=f"Exception error: {Error}"
+                logger.info(msg)
+            # 5.3 Report the results of the fault injection campaign            
+            FI_setup.parse_results()
+            # break
         FI_setup.terminate_fsim()
+
 
 
 if __name__ == '__main__':

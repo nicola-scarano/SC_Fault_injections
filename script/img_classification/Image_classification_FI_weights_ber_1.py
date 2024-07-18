@@ -254,17 +254,14 @@ def main(args):
     # teacher_model = torch.load(
     #         os.path.join(teacher_model_config['ckpt']), map_location=torch.device("cpu")
     #     )
-    # teacher_model = LeNet5(num_classes=10)
-    teacher_model = torch.load(teacher_model_config['ckpt'])
-    
+    teacher_model = LeNet5(num_classes=10)
     teacher_model.layer1[2]= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(6.4008), decimals=3), inplace=True)
     teacher_model.layer2[2]= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(8.2039), decimals=3), inplace=True)
     teacher_model.relu= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(27.2505), decimals=3), inplace=True)
     teacher_model.relu1= torch.nn.Hardtanh(min_val=0, max_val=torch.round(torch.tensor(45.0015), decimals=3), inplace=True)
     # teacher_model = rec_dnn_exploration(teacher_model)
 
-    # teacher_model.load_state_dict(torch.load(teacher_model_config['ckpt'])['state_dict'])
-
+    teacher_model.load_state_dict(torch.load(teacher_model_config['ckpt'])['state_dict'])
 
     logger.info(teacher_model)
     test_config = config['test']
@@ -292,7 +289,8 @@ def main(args):
 
     log_freq = test_config.get('log_freq', 1000)
     no_dp_eval = args.no_dp_eval
-    
+        
+
     test_batch_size=config['test']['test_data_loader']['batch_size']
     test_shuffle=config['test']['test_data_loader']['random_sample']
     test_num_workers=config['test']['test_data_loader']['num_workers']

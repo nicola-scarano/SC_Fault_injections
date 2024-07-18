@@ -1,0 +1,19 @@
+fault_info:
+  weights: 
+    mode_inj: 'weight'
+    layer: [1]    
+    ber_list: [0.0006, 0.0004, 0.0001, 0.00008, 0.00006, 0.00004, 0.00001, 0.000008, 0.000006, 0.000004, 0.000001]
+
+
+
+  neurons:
+    mode_inj: 'neurons'
+    layers: [4]
+    trials: 5
+    size_tail_y: 32 
+    size_tail_x: 32
+    block_fault_rate_delta: 0.1
+    block_fault_rate_steps: 5
+    neuron_fault_rate_delta: 0.1
+    neuron_fault_rate_steps: 5
+    num_threads: 32
